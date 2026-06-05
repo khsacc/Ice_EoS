@@ -1,0 +1,3 @@
+seafreeze
+scipy
+numpy

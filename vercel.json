@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "next dev --webpack",
+  "functions": {
+    "api/seafreeze.py": {
+      "runtime": "@vercel/python@4"
+    }
+  }
+}
