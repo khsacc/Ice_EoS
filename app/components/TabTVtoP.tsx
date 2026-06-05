@@ -14,12 +14,15 @@ import * as s from './Tab.css';
 interface Props {
   molecule: Molecule;
   polymorph: IcePolymorph;
+  refId: string;
+  onRefChange: (id: string) => void;
 }
 
-export default function TabTVtoP({ molecule, polymorph }: Props) {
-  const entries = LITERATURE[polymorph].filter((e) => e.molecule === molecule);
-
-  const [refId, setRefId] = useState(entries[0]?.id ?? '');
+export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Props) {
+  // FortesPowerExp entries are P=0 only and cannot appear in T,V→P
+  const entries = LITERATURE[polymorph].filter(
+    (e) => e.molecule === molecule && e.eosType !== 'FortesPowerExp',
+  );
   const [T, setT] = useState('');
   const [V, setV] = useState('');
   const [tempUnit, setTempUnit] = useState<TempUnit>('K');
@@ -136,7 +139,7 @@ export default function TabTVtoP({ molecule, polymorph }: Props) {
 
   return (
     <div className={s.tabContent}>
-      <LiteratureSelect entries={entries} value={refId} onChange={setRefId} />
+      <LiteratureSelect entries={entries} value={refId} onChange={onRefChange} />
 
       <div className={s.paramsBox}>
         {isSeaFreeze ? (

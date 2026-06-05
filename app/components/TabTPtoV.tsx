@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { LITERATURE, POLYMORPH_LABELS, MOLECULE_LABELS, POLYMORPH_Z, MOLAR_MASS } from '../lib/literature';
-import { computeVolume } from '../lib/eos';
+import { computeVolume, computeVolumeFortes } from '../lib/eos';
 import type { IcePolymorph, Molecule } from '../lib/literature';
 import {
   type TempUnit, type VolumeUnit,
@@ -14,12 +14,12 @@ import * as s from './Tab.css';
 interface Props {
   molecule: Molecule;
   polymorph: IcePolymorph;
+  refId: string;
+  onRefChange: (id: string) => void;
 }
 
-export default function TabTPtoV({ molecule, polymorph }: Props) {
+export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Props) {
   const entries = LITERATURE[polymorph].filter((e) => e.molecule === molecule);
-
-  const [refId, setRefId] = useState(entries[0]?.id ?? '');
   const [T, setT] = useState('');
   const [P, setP] = useState('');
   const [tempUnit, setTempUnit] = useState<TempUnit>('K');
@@ -31,6 +31,7 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
   const selected = entries.find((e) => e.id === refId) ?? entries[0];
   const isIsothermal = selected?.isothermal === true;
   const isSeaFreeze = selected?.eosType === 'SeaFreeze';
+  const isFortesPowerExp = selected?.eosType === 'FortesPowerExp';
 
   const Z = POLYMORPH_Z[polymorph];
   const M = MOLAR_MASS[molecule];
@@ -44,7 +45,28 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
     abortRef.current?.abort();
     abortRef.current = null;
 
-    if (!selected || P.trim() === '') {
+    if (!selected) { setResult(null); setError(null); setLoading(false); return; }
+
+    // FortesPowerExp: P is fixed at 0, only T is needed
+    if (isFortesPowerExp) {
+      if (T.trim() === '') { setResult(null); setError(null); setLoading(false); return; }
+      const Tval = parseFloat(T);
+      if (isNaN(Tval)) { setResult(null); setError(null); setLoading(false); return; }
+      const T_K = toKelvin(Tval, tempUnit);
+      try {
+        const V = computeVolumeFortes(T_K, selected.fortesParams!);
+        setResult({ V });
+        setError(null);
+      } catch (e) {
+        setResult(null);
+        setError((e as Error).message);
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Standard path: P is required
+    if (P.trim() === '') {
       setResult(null); setError(null); setLoading(false);
       return;
     }
@@ -92,7 +114,7 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
         });
       return () => { ctrl.abort(); };
     } else {
-      // Synchronous BM3 / Vinet
+      // Synchronous BM3 / Vinet / AP1
       try {
         const res = computeVolume(T_K, Pval, selected.params!, selected.eosType);
         setResult({ V: res.V });
@@ -103,7 +125,7 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
       }
       setLoading(false);
     }
-  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, M]);
+  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, isFortesPowerExp, M]);
 
   if (entries.length === 0) {
     return (
@@ -132,13 +154,22 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
 
   return (
     <div className={s.tabContent}>
-      <LiteratureSelect entries={entries} value={refId} onChange={setRefId} />
+      <LiteratureSelect entries={entries} value={refId} onChange={onRefChange} />
 
       <div className={s.paramsBox}>
         {isSeaFreeze ? (
           <>
             <strong>Gibbs energy (LBF) · SeaFreeze</strong>
             {selected.notes && <span> · {selected.notes}</span>}
+          </>
+        ) : isFortesPowerExp && selected.fortesParams ? (
+          <>
+            <strong>EoS parameters (Fortes power/exp · P = 0 GPa):</strong>{' '}
+            V₀ = {selected.fortesParams.V0_cell} Å³ (= {selected.fortesParams.V0.toFixed(3)} cm³/mol) ·
+            p = {selected.fortesParams.p.toExponential(2)} K⁻¹ ·
+            q = {selected.fortesParams.q} K ·
+            r = {selected.fortesParams.r.toExponential(2)} K⁻¹ ·
+            s = {selected.fortesParams.s} K
           </>
         ) : selected.params ? (
           <>
@@ -150,7 +181,8 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
         ) : null}
       </div>
 
-      {!isSeaFreeze && selected.notes && <p className={s.noteText}>{selected.notes}</p>}
+      {!isSeaFreeze && !isFortesPowerExp && selected.notes && <p className={s.noteText}>{selected.notes}</p>}
+      {isFortesPowerExp && selected.notes && <p className={s.noteText}>{selected.notes}</p>}
 
       <div className={s.inputGrid}>
         {/* Temperature */}
@@ -181,8 +213,8 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
               isIsothermal
                 ? undefined
                 : tempUnit === 'K'
-                ? (selected.params ? String(selected.params.T_ref) : '250')
-                : (selected.params ? String(Math.round(selected.params.T_ref - 273.15)) : '-23')
+                ? (isFortesPowerExp ? '200' : (selected.params ? String(selected.params.T_ref) : '250'))
+                : (isFortesPowerExp ? '-73' : (selected.params ? String(Math.round(selected.params.T_ref - 273.15)) : '-23'))
             }
           />
         </div>
@@ -194,10 +226,11 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
           </div>
           <input
             className={s.input}
-            type="number"
-            value={P}
-            onChange={(e) => setP(e.target.value)}
-            placeholder={selected.params ? String(selected.params.P_ref) : '0.3'}
+            type={isFortesPowerExp ? 'text' : 'number'}
+            disabled={isFortesPowerExp}
+            value={isFortesPowerExp ? '0 (fixed)' : P}
+            onChange={isFortesPowerExp ? undefined : (e) => setP(e.target.value)}
+            placeholder={isFortesPowerExp ? undefined : (selected.params ? String(selected.params.P_ref) : '0.3')}
           />
         </div>
       </div>
@@ -226,6 +259,8 @@ export default function TabTPtoV({ molecule, polymorph }: Props) {
       <p className={s.footerNote}>
         {isSeaFreeze
           ? 'SeaFreeze · Journaux et al. (2020) Gibbs LBF representation'
+          : isFortesPowerExp
+          ? 'α(T) = p·T^(q/T) + r·exp(s/T) · V(T) = V₀·exp(∫α dT) · P = 0 GPa fixed'
           : `${selected.eosType} EoS${!isIsothermal ? ' · V₀(T) = V₀ · (1 + α(T − T_ref))' : ''}`}
         {' '}· unit cell Z = {Z}
       </p>
