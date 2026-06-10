@@ -1,6 +1,6 @@
 import type { VolumeUnit } from './units';
 
-export type IcePolymorph = 'Ih' | 'II' | 'III' | 'V' | 'VI' | 'VII' | 'VIII';
+export type IcePolymorph = 'Ih' | 'II' | 'III' | 'V' | 'VI' | 'VII' | 'VIII' | 'X';
 export type Molecule = 'H2O' | 'D2O';
 
 export interface EoSParameters {
@@ -11,10 +11,13 @@ export interface EoSParameters {
   P_ref: number;        // GPa
   K0: number;           // GPa
   K0p: number;          // dK/dP (dimensionless)
-  alpha: number;        // K⁻¹, volumetric thermal expansion (0 for isothermal)
+  alpha: number;        // K⁻¹, volumetric thermal expansion coefficient (α₀ for VinetAG/BM3Thermal, 0 for isothermal)
+  alpha1?: number;      // K⁻², quadratic thermal expansion (BM3Thermal): α(T) = alpha + alpha1*(T-T_ref)
+  dKdT?: number;        // GPa/K, linear T-dependence of bulk modulus (BM3Thermal): K₀(T) = K0 + dKdT*(T-T_ref)
+  deltaT?: number;      // Anderson-Grüneisen parameter δ_T (VinetAG only)
 }
 
-export type EoSType = 'BM3' | 'Vinet' | 'AP1' | 'SeaFreeze' | 'FortesPowerExp';
+export type EoSType = 'BM3' | 'Vinet' | 'AP1' | 'SeaFreeze' | 'FortesPowerExp' | 'Murnaghan' | 'VinetAG' | 'BM3Thermal';
 
 // Parameters for Fortes (2018) power/exponential thermal expansion model (P = 0 only)
 // α(T) = p·T^(q/T) + r·exp(s/T)
@@ -28,6 +31,22 @@ export interface FortesPowerExpParams {
   s: number;        // K (characteristic temperature, exponential term)
 }
 
+// Parameters for Murnaghan (1944) thermal PVT EoS — Fortes et al. (2012) form
+// V(P,T) = V_{P_ref,T_ref}(T) / [P*(K'/K(T)) + 1]^(1/K')
+// V_ref(T) = V_ref + X1·T* + X2·T*²    T* = T − T_ref
+// K(T)     = K_ref + dKdT·T*
+// P* = P − P_ref
+export interface MurnaghanParams {
+  V_ref: number;  // cm³/mol at P_ref, T_ref
+  X1: number;     // cm³/mol/K
+  X2: number;     // cm³/mol/K²
+  K_ref: number;  // GPa, bulk modulus at P_ref, T_ref
+  dKdT: number;   // GPa/K, ∂K/∂T at constant P
+  Kp: number;     // dimensionless, K' = ∂K/∂P
+  P_ref: number;  // GPa, reference pressure
+  T_ref: number;  // K, reference temperature
+}
+
 export interface LiteratureEntry {
   id: string;
   citation: string;
@@ -35,14 +54,15 @@ export interface LiteratureEntry {
   doi?: string;
   eosType: EoSType;
   molecule: Molecule;
-  params?: EoSParameters;              // undefined for SeaFreeze / FortesPowerExp entries
+  params?: EoSParameters;              // undefined for SeaFreeze / FortesPowerExp / Murnaghan entries
   fortesParams?: FortesPowerExpParams; // defined only for FortesPowerExp entries
+  murnaghanParams?: MurnaghanParams;   // defined only for Murnaghan entries
   seafreezePhase?: string;             // 'II' | 'III' | 'V' | 'VI' for SeaFreeze entries
   isothermal?: boolean;
   notes?: string;
 }
 
-export const POLYMORPHS: IcePolymorph[] = ['Ih', 'II', 'III', 'V', 'VI', 'VII', 'VIII'];
+export const POLYMORPHS: IcePolymorph[] = ['Ih', 'II', 'III', 'V', 'VI', 'VII', 'VIII', 'X'];
 export const MOLECULES: Molecule[] = ['H2O', 'D2O'];
 
 export const POLYMORPH_LABELS: Record<IcePolymorph, string> = {
@@ -53,6 +73,7 @@ export const POLYMORPH_LABELS: Record<IcePolymorph, string> = {
   VI: 'Ice VI',
   VII: 'Ice VII',
   VIII: 'Ice VIII',
+  X: 'Ice X',
 };
 
 export const MOLECULE_LABELS: Record<Molecule, string> = {
@@ -74,10 +95,70 @@ export const POLYMORPH_Z: Record<IcePolymorph, number> = {
   VI:  10,  // P4₂/nmc tetragonal
   VII:  2,  // Pn3̄m cubic
   VIII: 8,  // I4₁/amd body-centered tetragonal
+  X:    2,  // Pn3̄m cubic (proton-symmetric; same bcc O sublattice as VII)
 };
 
 export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
+  X: [
+    {
+      id: 'x_h2o_sugimura2008',
+      citation: 'Sugimura et al. (2008)',
+      fullRef: 'Sugimura, E. et al. (2008). Compression of H₂O ice to 126 GPa and implications for hydrogen-bond symmetrization: Synchrotron x-ray diffraction measurements and density-functional calculations. Phys. Rev. B, 77, 214103.',
+      doi: '10.1103/PhysRevB.77.214103',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table II, Experiment row "Dynamically disordered ice X". K' fixed at 4.
+      params: { V0: 8.05, T_ref: 300, P_ref: 0, K0: 145, K0p: 4, alpha: 0 },
+      notes: 'Table II, Experiment. Vinet EoS fit to data above ~63 GPa at 300 K. K₀′ fixed at 4. V₀ is a fitted parameter (not measured at 0 GPa).',
+    },
+  ],
   VIII: [
+    {
+      id: 'viii_h2o_fukui2022_10k',
+      citation: 'Fukui et al. (2022) 10 K',
+      fullRef: 'Fukui, H. et al. (2022). Equation of states for dense ice up to 80 GPa at low-temperature conditions. J. Chem. Phys., 156, 064504.',
+      doi: '10.1063/5.0084278',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      params: { V0: 12.030, T_ref: 10, P_ref: 0, K0: 30.8, K0p: 3.7, alpha: 0 },
+      notes: 'Table I, BM3 at 10 K. V₀ fixed from literature. Valid 9.8–53.0 GPa.',
+    },
+    {
+      id: 'viii_h2o_fukui2022_120k',
+      citation: 'Fukui et al. (2022) 120 K',
+      fullRef: 'Fukui, H. et al. (2022). Equation of states for dense ice up to 80 GPa at low-temperature conditions. J. Chem. Phys., 156, 064504.',
+      doi: '10.1063/5.0084278',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      params: { V0: 12.129, T_ref: 120, P_ref: 0, K0: 26.7, K0p: 4.1, alpha: 0 },
+      notes: 'Table I, BM3 at 120 K. V₀ fixed from literature. Valid 9.0–52.6 GPa.',
+    },
+    {
+      id: 'viii_h2o_fukui2022_300k',
+      citation: 'Fukui et al. (2022) 300 K',
+      fullRef: 'Fukui, H. et al. (2022). Equation of states for dense ice up to 80 GPa at low-temperature conditions. J. Chem. Phys., 156, 064504.',
+      doi: '10.1063/5.0084278',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      params: { V0: 12.730, T_ref: 300, P_ref: 0, K0: 18.1, K0p: 4.59, alpha: 0 },
+      notes: 'Table I, BM3 at 300 K. V₀ fixed from literature. Valid 4.4–78.2 GPa.',
+    },
+    {
+      id: 'viii_h2o_fukui2022_roomt',
+      citation: 'Fukui et al. (2022) Room T',
+      fullRef: 'Fukui, H. et al. (2022). Equation of states for dense ice up to 80 GPa at low-temperature conditions. J. Chem. Phys., 156, 064504.',
+      doi: '10.1063/5.0084278',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      // V₀ free fit = 12.63(9) cm³/mol. Combined with previous data below 30 GPa (Refs. 21 & 26 therein).
+      params: { V0: 12.63, T_ref: 300, P_ref: 0, K0: 14.8, K0p: 5.9, alpha: 0 },
+      notes: 'Table I, BM3 at room T. Combined with refs 21 & 26 below 30 GPa; V₀ free fit.',
+    },
     {
       id: 'viii_d2o_klotz2017_bm3_93k',
       citation: 'Klotz et al. (2017) BM3 93 K',
@@ -212,15 +293,7 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       seafreezePhase: 'II',
       notes: 'Gibbs energy (LBF) representation. Valid: ~0.20–0.45 GPa, 180–270 K.',
     },
-    {
-      id: 'ii_h2o_lobban2002',
-      citation: 'Lobban et al. (2002)',
-      fullRef: 'Lobban, C. et al. (2002). Ice II structure and transitions. J. Chem. Phys., 117, 3928–3934.',
-      doi: '10.1063/1.1495837',
-      eosType: 'BM3',
-      molecule: 'H2O',
-      params: { V0: 17.10, T_ref: 250, P_ref: 0, K0: 13.0, K0p: 5.0, alpha: 3.3e-5 },
-    },
+
     {
       id: 'ii_d2o_fortes2006',
       citation: 'Fortes et al. (2006)',
@@ -241,15 +314,7 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       seafreezePhase: 'III',
       notes: 'Gibbs energy (LBF) representation. Valid: ~0.29–0.45 GPa, 240–270 K.',
     },
-    {
-      id: 'iii_h2o_lobban2000',
-      citation: 'Lobban et al. (2000)',
-      fullRef: 'Lobban, C. et al. (2000). The structure of ice III. Acta Cryst. B, 56, 698–705.',
-      eosType: 'BM3',
-      molecule: 'H2O',
-      params: { V0: 17.20, T_ref: 250, P_ref: 0, K0: 8.5, K0p: 5.0, alpha: 3.0e-5 },
-      notes: 'Prototype values. Ice III is stable only in a narrow field (0.30–0.45 GPa, 250–270 K).',
-    },
+
   ],
   V: [
     {
@@ -262,16 +327,7 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       seafreezePhase: 'V',
       notes: 'Gibbs energy (LBF) representation. Valid: ~0.40–0.62 GPa, 210–280 K.',
     },
-    {
-      id: 'v_h2o_lobban1998',
-      citation: 'Lobban et al. (1998)',
-      fullRef: 'Lobban, C. et al. (1998). The structure of a new phase of ice. Nature, 391, 268–270.',
-      doi: '10.1038/34622',
-      eosType: 'BM3',
-      molecule: 'H2O',
-      params: { V0: 16.50, T_ref: 250, P_ref: 0, K0: 10.0, K0p: 5.0, alpha: 3.0e-5 },
-      notes: 'Prototype values. Ice V is stable 0.40–0.60 GPa.',
-    },
+
     {
       id: 'v_h2o_fortes2014',
       citation: 'Fortes et al. (2014)',
@@ -299,7 +355,9 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1063/1.4894421',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 13.59, T_ref: 300, P_ref: 0, K0: 14.05, K0p: 5.36, alpha: 2.9e-5 },
+      // Table II, PVT fit. BM2 (K₀' = 4 fixed). α₀ = 14.6(14) × 10⁻⁵ K⁻¹.
+      params: { V0: 14.17, T_ref: 300, P_ref: 0, K0: 14.05, K0p: 4, alpha: 1.46e-4 },
+      notes: 'PVT BM2 fit (K₀′ fixed at 4). Valid ~1–2.6 GPa, 300–340 K. Table II.',
     },
     {
       id: 'vi_h2o_fortes2012',
@@ -309,8 +367,37 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       params: { V0: 13.60, T_ref: 295, P_ref: 0, K0: 13.7, K0p: 5.4, alpha: 3.0e-5 },
     },
+    {
+      id: 'vi_d2o_fortes2012',
+      citation: 'Fortes et al. (2012) D₂O',
+      fullRef: 'Fortes, A.D. et al. (2012). The P–V–T equation of state of D₂O ice VI determined by neutron powder diffraction in the range 0 < P < 2.6 GPa and 120 < T < 330 K. J. Appl. Cryst., 45, 523–534.',
+      doi: '10.1107/S0021889812014847',
+      eosType: 'Murnaghan',
+      molecule: 'D2O',
+      // Table 4, unit-cell volume column. Z=10, V_cell[Å³] / (10×1.66054) → cm³/mol.
+      // V_1.25,225 = 214.94 Å³ → 12.944 cm³/mol
+      // X1 = 6.1×10⁻² Å³/K → 3.673×10⁻³ cm³/mol/K
+      // X2 = 6.1×10⁻⁵ Å³/K² → 3.673×10⁻⁶ cm³/mol/K²
+      murnaghanParams: {
+        V_ref: 12.944, X1: 3.673e-3, X2: 3.673e-6,
+        K_ref: 21.7, dKdT: -0.015, Kp: 4.4,
+        P_ref: 1.25, T_ref: 225,
+      },
+      notes: 'Murnaghan PVT fit. Valid 0 < P < 2.6 GPa, 120 < T < 330 K. Table 4.',
+    },
   ],
   VII: [
+    {
+      id: 'vii_h2o_bezacier2014',
+      citation: 'Bezacier et al. (2014)',
+      fullRef: 'Bezacier, L. et al. (2014). Equations of state of ice VI and ice VII at high pressure and high temperature. J. Chem. Phys., 141, 104505.',
+      doi: '10.1063/1.4894421',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      // Table II, PVT fit. BM2 (K₀' = 4 fixed). α₀ = 11.58(54) × 10⁻⁵ K⁻¹.
+      params: { V0: 12.49, T_ref: 300, P_ref: 0, K0: 20.15, K0p: 4, alpha: 1.158e-4 },
+      notes: 'PVT BM2 fit (K₀′ fixed at 4). Valid ~2.7–10.1 GPa, 300–450 K. Table II.',
+    },
     {
       id: 'vii_h2o_fei1993',
       citation: 'Fei et al. (1993)',
@@ -327,16 +414,176 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1038/330737a0',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 12.49, T_ref: 300, P_ref: 0, K0: 22.6, K0p: 4.3, alpha: 2.5e-5 },
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=23.7(9), K'=4.15(7), V₀=12.3(3) cm³/mol. RT only.
+      params: { V0: 12.3, T_ref: 300, P_ref: 0, K0: 23.7, K0p: 4.15, alpha: 0 },
+      notes: 'BM3 fit, 4.3–128 GPa, RT. V₀ extrapolated to zero pressure.',
+    },
+    {
+      id: 'vii_h2o_frank2004',
+      citation: 'Frank et al. (2004)',
+      fullRef: 'Frank, M.R., Fei, Y. & Hu, J. (2004). Constraining the equation of state of fluid H₂O to 80 GPa using the melting curve, bulk modulus, and thermal expansivity of Ice VII. Geochim. Cosmochim. Acta, 68, 2781–2790.',
+      doi: '10.1016/j.gca.2003.12.007',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 3 "This study". BM3 fit; V₀ constrained by compression data (nonquenchable phase).
+      params: { V0: 12.4, T_ref: 300, P_ref: 0, K0: 21.1, K0p: 4.4, alpha: 0 },
+      notes: 'Table 3, BM3 fit at 300 K. Valid 6.82–60.52 GPa. V₀ is a fitted parameter (ice VII is nonquenchable).',
     },
     {
       id: 'vii_h2o_sugimura2008',
       citation: 'Sugimura et al. (2008)',
-      fullRef: 'Sugimura, E. et al. (2008). Compression of H₂O ice to 126 GPa and implications for hydrogen-bond symmetrization. Phys. Rev. B, 77, 214103.',
+      fullRef: 'Sugimura, E. et al. (2008). Compression of H₂O ice to 126 GPa and implications for hydrogen-bond symmetrization: Synchrotron x-ray diffraction measurements and density-functional calculations. Phys. Rev. B, 77, 214103.',
       doi: '10.1103/PhysRevB.77.214103',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table II, Experiment row. V₀ = 14.52 cm³/mol fixed from ambient conditions (Ref. 3 therein).
+      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 5.02, K0p: 7.51, alpha: 0 },
+      notes: 'Table II, Experiment. Vinet EoS fit to synchrotron XRD data up to ~40 GPa at 300 K. V₀ fixed at ambient value.',
+    },
+    {
+      id: 'vii_h2o_sugimura2010',
+      citation: 'Sugimura et al. (2010)',
+      fullRef: 'Sugimura, E. et al. (2010). Simultaneous high-pressure and high-temperature volume measurements of ice VII and its thermal equation of state. Phys. Rev. B, 82, 134103.',
+      doi: '10.1103/PhysRevB.82.134103',
+      eosType: 'VinetAG',
+      molecule: 'H2O',
+      // Table II "This study": V₀=14.52 cm³/mol (from Loubeyre et al.), K₀=5.02 GPa, K'=7.51 (same as Sugimura 2008)
+      // α₀=150×10⁻⁵ K⁻¹, δ_T=5.1 (Anderson-Grüneisen thermal expansion)
+      // P(V,T) = P_Vinet(V,T₀) + α₀·(V/V₀)^δ_T · K_T_Vinet(V) · (T−T₀)
+      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 5.02, K0p: 7.51, alpha: 1.50e-3, deltaT: 5.1 },
+      notes: 'Table II, This study. Vinet + Anderson-Grüneisen P-V-T EoS. Valid ~19–50 GPa, 430–880 K.',
+    },
+    // --- Lai et al. (2022) ---
+    {
+      id: 'vii_h2o_lai2022',
+      citation: 'Lai et al. (2022)',
+      fullRef: 'Lai, X. et al. (2022). Thermal equation of state of ice-VII revisited by single-crystal X-ray diffraction. American Mineralogist.',
+      doi: '10.2138/am-2022-8554',
+      eosType: 'BM3Thermal',
+      molecule: 'H2O',
+      // Table 1 "This study", BM EoS thermal. V₀=12.3 cm³/mol fixed at 300 K.
+      // K₀(T)=21.0+(-0.009)(T-300) GPa; α(T)=15×10⁻⁵+15×10⁻⁸(T-300) K⁻¹ [Berman 1988]
+      params: {
+        V0: 12.3, T_ref: 300, P_ref: 0,
+        K0: 21.0, K0p: 4.45,
+        alpha: 15e-5, alpha1: 15e-8, dKdT: -0.009,
+      },
+      notes: 'Table 1, Berman (1988) thermal BM3. Valid 3.5–78.2 GPa, 300–1000 K. SCXRD.',
+    },
+    {
+      id: 'vii_h2o_lai2022_300k',
+      citation: 'Lai et al. (2022) 300 K',
+      fullRef: 'Lai, X. et al. (2022). Thermal equation of state of ice-VII revisited by single-crystal X-ray diffraction. American Mineralogist.',
+      doi: '10.2138/am-2022-8554',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 12.50, T_ref: 300, P_ref: 0, K0: 21.5, K0p: 4.5, alpha: 2.5e-5 },
+      isothermal: true,
+      // Table 1 "This study", BM EoS 300 K fit (V₀ fitted).
+      params: { V0: 12.4, T_ref: 300, P_ref: 0, K0: 19.2, K0p: 4.6, alpha: 0 },
+      notes: 'Table 1, isothermal BM3 at 300 K. Valid 3.5–78.2 GPa. SCXRD.',
+    },
+    {
+      id: 'vii_h2o_lai2022_300k_vinet',
+      citation: 'Lai et al. (2022) Vinet 300 K',
+      fullRef: 'Lai, X. et al. (2022). Thermal equation of state of ice-VII revisited by single-crystal X-ray diffraction. American Mineralogist.',
+      doi: '10.2138/am-2022-8554',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 "This study", Vinet EoS 300 K fit (V₀ fitted, preferred by authors).
+      params: { V0: 12.7, T_ref: 300, P_ref: 0, K0: 15.0, K0p: 5.6, alpha: 0 },
+      notes: 'Table 1, isothermal Vinet at 300 K (fitted V₀). Valid 3.5–78.2 GPa. SCXRD.',
+    },
+    // --- Wolanin et al. (1997) ---
+    {
+      id: 'vii_h2o_wolanin1997_bm3',
+      citation: 'Wolanin et al. (1997) BM3',
+      fullRef: 'Wolanin, E. et al. (1997). Equation of state of ice VII up to 106 GPa. Phys. Rev. B, 56, 5781.',
+      doi: '10.1103/PhysRevB.56.5781',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=14.9(8) fixed, K'=5.4(1), V₀=12.37(8). RT.
+      params: { V0: 12.37, T_ref: 300, P_ref: 0, K0: 14.9, K0p: 5.4, alpha: 0 },
+      notes: 'BM3 fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
+    },
+    {
+      id: 'vii_h2o_wolanin1997_vinet',
+      citation: 'Wolanin et al. (1997) Vinet',
+      fullRef: 'Wolanin, E. et al. (1997). Equation of state of ice VII up to 106 GPa. Phys. Rev. B, 56, 5781.',
+      doi: '10.1103/PhysRevB.56.5781',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=14.9(8) fixed, K'=6.2(1), V₀=12.1(3). RT.
+      params: { V0: 12.1, T_ref: 300, P_ref: 0, K0: 14.9, K0p: 6.2, alpha: 0 },
+      notes: 'Vinet fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
+    },
+    // --- Loubeyre et al. (1999) ---
+    {
+      id: 'vii_h2o_loubeyre1999',
+      citation: 'Loubeyre et al. (1999)',
+      fullRef: 'Loubeyre, P. et al. (1999). Modulated phases and proton centring in ice observed by X-ray diffraction up to 170 GPa. Nature, 397, 503–506.',
+      doi: '10.1038/17109',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=4.26, K'=7.75, V₀=14.52. RT, 2–170 GPa.
+      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 4.26, K0p: 7.75, alpha: 0 },
+      notes: 'Vinet fit, 2–170 GPa, RT. V₀ fixed at ambient value. SCXRD.',
+    },
+    // --- Somayazulu et al. (2008) ---
+    {
+      id: 'vii_h2o_somayazulu2008',
+      citation: 'Somayazulu et al. (2008)',
+      fullRef: 'Somayazulu, M. et al. (2008). In situ high-pressure x-ray diffraction study of H₂O ice VII. J. Chem. Phys., 128, 064510.',
+      doi: '10.1063/1.2813890',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=4.21(4), K'=7.77(2), V₀=14.52(5). RT, 3–48 GPa.
+      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 4.21, K0p: 7.77, alpha: 0 },
+      notes: 'Vinet fit, 3–48 GPa, RT. rXRD + SXRD.',
+    },
+    // --- Grande et al. (2022) — 3 pressure-range Vinet fits ---
+    {
+      id: 'vii_h2o_grande2022_low',
+      citation: 'Grande et al. (2022) 2.7–5.1 GPa',
+      fullRef: 'Grande, Z.M. et al. (2022). Pressure-driven symmetry transitions in dense H₂O ice. Phys. Rev. B, 105, 104109.',
+      doi: '10.1103/PhysRevB.105.104109',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=18.5(40), K'=2.5(16), V₀=12.79(27). RT.
+      params: { V0: 12.79, T_ref: 300, P_ref: 0, K0: 18.5, K0p: 2.5, alpha: 0 },
+      notes: 'Vinet fit, 2.7–5.1 GPa, RT. PXRD.',
+    },
+    {
+      id: 'vii_h2o_grande2022_mid',
+      citation: 'Grande et al. (2022) 5.1–30.9 GPa',
+      fullRef: 'Grande, Z.M. et al. (2022). Pressure-driven symmetry transitions in dense H₂O ice. Phys. Rev. B, 105, 104109.',
+      doi: '10.1103/PhysRevB.105.104109',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=20.8(25), K'=4.49(35), V₀=12.37(16). RT.
+      params: { V0: 12.37, T_ref: 300, P_ref: 0, K0: 20.8, K0p: 4.49, alpha: 0 },
+      notes: 'Vinet fit, 5.1–30.9 GPa, RT. PXRD.',
+    },
+    {
+      id: 'vii_h2o_grande2022_high',
+      citation: 'Grande et al. (2022) 30.9–60 GPa',
+      fullRef: 'Grande, Z.M. et al. (2022). Pressure-driven symmetry transitions in dense H₂O ice. Phys. Rev. B, 105, 104109.',
+      doi: '10.1103/PhysRevB.105.104109',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=50.5(42), K'=4.50(15), V₀=10.18(13). RT.
+      params: { V0: 10.18, T_ref: 300, P_ref: 0, K0: 50.5, K0p: 4.50, alpha: 0 },
+      notes: 'Vinet fit, 30.9–60 GPa, RT. PXRD.',
     },
     {
       id: 'vii_d2o_klotz2017_bm3',

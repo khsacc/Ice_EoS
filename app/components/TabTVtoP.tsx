@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { LITERATURE, POLYMORPH_LABELS, MOLECULE_LABELS, POLYMORPH_Z, MOLAR_MASS } from '../lib/literature';
-import { computePressure } from '../lib/eos';
+import { computePressure, computePressureMurnaghan } from '../lib/eos';
 import type { IcePolymorph, Molecule } from '../lib/literature';
 import {
   type TempUnit, type VolumeUnit,
@@ -23,6 +23,7 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
   const entries = LITERATURE[polymorph].filter(
     (e) => e.molecule === molecule && e.eosType !== 'FortesPowerExp',
   );
+
   const [T, setT] = useState('');
   const [V, setV] = useState('');
   const [tempUnit, setTempUnit] = useState<TempUnit>('K');
@@ -35,6 +36,9 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
   const selected = entries.find((e) => e.id === refId) ?? entries[0];
   const isIsothermal = selected?.isothermal === true;
   const isSeaFreeze = selected?.eosType === 'SeaFreeze';
+  const isMurnaghan = selected?.eosType === 'Murnaghan';
+  const isVinetAG = selected?.eosType === 'VinetAG';
+  const isBM3Thermal = selected?.eosType === 'BM3Thermal';
   const Z = POLYMORPH_Z[polymorph];
   const M = MOLAR_MASS[molecule];
 
@@ -95,6 +99,16 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
           }
         });
       return () => { ctrl.abort(); };
+    } else if (isMurnaghan) {
+      try {
+        const P = computePressureMurnaghan(T_K, V_molar, selected.murnaghanParams!);
+        setResult({ P, V_molar });
+        setError(null);
+      } catch (e) {
+        setResult(null);
+        setError((e as Error).message);
+      }
+      setLoading(false);
     } else {
       try {
         const res = computePressure(T_K, V_molar, selected.params!, selected.eosType);
@@ -106,7 +120,7 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
       }
       setLoading(false);
     }
-  }, [T, V, tempUnit, volUnit, refId, selected, isIsothermal, isSeaFreeze, Z, M]);
+  }, [T, V, tempUnit, volUnit, refId, selected, isIsothermal, isSeaFreeze, isMurnaghan, isVinetAG, isBM3Thermal, Z, M]);
 
   if (entries.length === 0) {
     return (
@@ -134,7 +148,11 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
     : null;
 
   // V placeholder in current unit
-  const v0InUnit = selected.params ? fromMolar(selected.params.V0, volUnit, Z, M) : null;
+  const v0InUnit = isMurnaghan && selected.murnaghanParams
+    ? fromMolar(selected.murnaghanParams.V_ref, volUnit, Z, M)
+    : selected.params
+    ? fromMolar(selected.params.V0, volUnit, Z, M)
+    : null;
   const placeholderV = v0InUnit != null ? v0InUnit.toFixed(VOLUME_UNIT_DECIMALS[volUnit]) : '';
 
   return (
@@ -146,6 +164,29 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
           <>
             <strong>Gibbs energy (LBF) · SeaFreeze</strong>
             {selected.notes && <span> · {selected.notes}</span>}
+          </>
+        ) : isMurnaghan && selected.murnaghanParams ? (
+          <>
+            <strong>EoS parameters (Murnaghan PVT):</strong>{' '}
+            V₁.₂₅,₂₂₅ = {selected.murnaghanParams.V_ref.toFixed(3)} cm³/mol ·
+            K₁.₂₅,₂₂₅ = {selected.murnaghanParams.K_ref} GPa ·
+            ∂K/∂T = {selected.murnaghanParams.dKdT} GPa/K ·
+            K′ = {selected.murnaghanParams.Kp}
+          </>
+        ) : isVinetAG && selected.params ? (
+          <>
+            <strong>EoS parameters (Vinet + Anderson-Grüneisen):</strong>{' '}
+            V₀ = {v0Display} · T_ref = {selected.params.T_ref} K ·
+            K₀ = {selected.params.K0} GPa · K₀′ = {selected.params.K0p} ·
+            α₀ = {selected.params.alpha.toExponential(2)} K⁻¹ · δ_T = {selected.params.deltaT}
+          </>
+        ) : isBM3Thermal && selected.params ? (
+          <>
+            <strong>EoS parameters (BM3 thermal, Berman 1988):</strong>{' '}
+            V₀ = {v0Display} · T_ref = {selected.params.T_ref} K ·
+            K₀ = {selected.params.K0} GPa · K₀′ = {selected.params.K0p} ·
+            α₀ = {selected.params.alpha.toExponential(2)} K⁻¹ · α₁ = {(selected.params.alpha1 ?? 0).toExponential(2)} K⁻² ·
+            dK/dT = {selected.params.dKdT} GPa/K
           </>
         ) : selected.params ? (
           <>
@@ -188,8 +229,8 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
               isIsothermal
                 ? undefined
                 : tempUnit === 'K'
-                ? (selected.params ? String(selected.params.T_ref) : '250')
-                : (selected.params ? String(Math.round(selected.params.T_ref - 273.15)) : '-23')
+                ? (isMurnaghan ? String(selected.murnaghanParams!.T_ref) : selected.params ? String(selected.params.T_ref) : '250')
+                : (isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : selected.params ? String(Math.round(selected.params.T_ref - 273.15)) : '-23')
             }
           />
         </div>
@@ -238,6 +279,12 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
       <p className={s.footerNote}>
         {isSeaFreeze
           ? 'SeaFreeze · Journaux et al. (2020) Gibbs LBF representation'
+          : isMurnaghan
+          ? 'Murnaghan PVT · P = P_ref + (K(T)/K′)·[(V_ref(T)/V)^K′ − 1]'
+          : isVinetAG
+          ? 'VinetAG · P_th = α₀·(V/V₀)^δ_T · K_T(V) · (T − T_ref)'
+          : isBM3Thermal
+          ? 'BM3 thermal · V_T0=V₀[1+α₀ΔT+½α₁ΔT²] · K_T0=K₀+(dK/dT)ΔT'
           : `${selected.eosType} EoS${!isIsothermal ? ' · V₀(T) = V₀ · (1 + α(T − T_ref))' : ''}`}
         {' '}· unit cell Z = {Z}
       </p>

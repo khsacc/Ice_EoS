@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { LITERATURE, POLYMORPH_LABELS, MOLECULE_LABELS, POLYMORPH_Z, MOLAR_MASS } from '../lib/literature';
-import { computeVolume, computeVolumeFortes } from '../lib/eos';
+import { computeVolume, computeVolumeFortes, computeVolumeMurnaghan } from '../lib/eos';
 import type { IcePolymorph, Molecule } from '../lib/literature';
 import {
   type TempUnit, type VolumeUnit,
@@ -32,6 +32,9 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
   const isIsothermal = selected?.isothermal === true;
   const isSeaFreeze = selected?.eosType === 'SeaFreeze';
   const isFortesPowerExp = selected?.eosType === 'FortesPowerExp';
+  const isMurnaghan = selected?.eosType === 'Murnaghan';
+  const isVinetAG = selected?.eosType === 'VinetAG';
+  const isBM3Thermal = selected?.eosType === 'BM3Thermal';
 
   const Z = POLYMORPH_Z[polymorph];
   const M = MOLAR_MASS[molecule];
@@ -84,6 +87,19 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
 
     if (T_K === null) { setResult(null); setError(null); setLoading(false); return; }
 
+    if (isMurnaghan) {
+      try {
+        const V = computeVolumeMurnaghan(T_K, Pval, selected.murnaghanParams!);
+        setResult({ V });
+        setError(null);
+      } catch (e) {
+        setResult(null);
+        setError((e as Error).message);
+      }
+      setLoading(false);
+      return;
+    }
+
     if (isSeaFreeze) {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -125,7 +141,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
       }
       setLoading(false);
     }
-  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, isFortesPowerExp, M]);
+  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, isFortesPowerExp, isMurnaghan, isVinetAG, isBM3Thermal, M]);
 
   if (entries.length === 0) {
     return (
@@ -171,6 +187,29 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
             r = {selected.fortesParams.r.toExponential(2)} K⁻¹ ·
             s = {selected.fortesParams.s} K
           </>
+        ) : isMurnaghan && selected.murnaghanParams ? (
+          <>
+            <strong>EoS parameters (Murnaghan PVT):</strong>{' '}
+            V₁.₂₅,₂₂₅ = {selected.murnaghanParams.V_ref.toFixed(3)} cm³/mol ·
+            K₁.₂₅,₂₂₅ = {selected.murnaghanParams.K_ref} GPa ·
+            ∂K/∂T = {selected.murnaghanParams.dKdT} GPa/K ·
+            K′ = {selected.murnaghanParams.Kp}
+          </>
+        ) : isVinetAG && selected.params ? (
+          <>
+            <strong>EoS parameters (Vinet + Anderson-Grüneisen):</strong>{' '}
+            V₀ = {v0Display} · T_ref = {selected.params.T_ref} K ·
+            K₀ = {selected.params.K0} GPa · K₀′ = {selected.params.K0p} ·
+            α₀ = {selected.params.alpha.toExponential(2)} K⁻¹ · δ_T = {selected.params.deltaT}
+          </>
+        ) : isBM3Thermal && selected.params ? (
+          <>
+            <strong>EoS parameters (BM3 thermal, Berman 1988):</strong>{' '}
+            V₀ = {v0Display} · T_ref = {selected.params.T_ref} K ·
+            K₀ = {selected.params.K0} GPa · K₀′ = {selected.params.K0p} ·
+            α₀ = {selected.params.alpha.toExponential(2)} K⁻¹ · α₁ = {(selected.params.alpha1 ?? 0).toExponential(2)} K⁻² ·
+            dK/dT = {selected.params.dKdT} GPa/K
+          </>
         ) : selected.params ? (
           <>
             <strong>EoS parameters ({selected.eosType}):</strong>{' '}
@@ -181,8 +220,9 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
         ) : null}
       </div>
 
-      {!isSeaFreeze && !isFortesPowerExp && selected.notes && <p className={s.noteText}>{selected.notes}</p>}
-      {isFortesPowerExp && selected.notes && <p className={s.noteText}>{selected.notes}</p>}
+      {(isFortesPowerExp || isMurnaghan || isVinetAG || (!isSeaFreeze && selected.notes)) && selected.notes && (
+        <p className={s.noteText}>{selected.notes}</p>
+      )}
 
       <div className={s.inputGrid}>
         {/* Temperature */}
@@ -213,8 +253,8 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
               isIsothermal
                 ? undefined
                 : tempUnit === 'K'
-                ? (isFortesPowerExp ? '200' : (selected.params ? String(selected.params.T_ref) : '250'))
-                : (isFortesPowerExp ? '-73' : (selected.params ? String(Math.round(selected.params.T_ref - 273.15)) : '-23'))
+                ? (isFortesPowerExp ? '200' : isMurnaghan ? String(selected.murnaghanParams!.T_ref) : (selected.params ? String(selected.params.T_ref) : '250'))
+                : (isFortesPowerExp ? '-73' : isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : (selected.params ? String(Math.round(selected.params.T_ref - 273.15)) : '-23'))
             }
           />
         </div>
@@ -230,7 +270,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
             disabled={isFortesPowerExp}
             value={isFortesPowerExp ? '0 (fixed)' : P}
             onChange={isFortesPowerExp ? undefined : (e) => setP(e.target.value)}
-            placeholder={isFortesPowerExp ? undefined : (selected.params ? String(selected.params.P_ref) : '0.3')}
+            placeholder={isFortesPowerExp ? undefined : isMurnaghan ? String(selected.murnaghanParams!.P_ref) : (selected.params ? String(selected.params.P_ref) : '0.3')}
           />
         </div>
       </div>
@@ -261,6 +301,12 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
           ? 'SeaFreeze · Journaux et al. (2020) Gibbs LBF representation'
           : isFortesPowerExp
           ? 'α(T) = p·T^(q/T) + r·exp(s/T) · V(T) = V₀·exp(∫α dT) · P = 0 GPa fixed'
+          : isMurnaghan
+          ? 'Murnaghan PVT · V = V_ref(T)/[P*(K′/K(T))+1]^(1/K′)'
+          : isVinetAG
+          ? 'VinetAG · P_th = α₀·(V/V₀)^δ_T · K_T(V) · (T − T_ref)'
+          : isBM3Thermal
+          ? 'BM3 thermal · V_T0=V₀[1+α₀ΔT+½α₁ΔT²] · K_T0=K₀+(dK/dT)ΔT'
           : `${selected.eosType} EoS${!isIsothermal ? ' · V₀(T) = V₀ · (1 + α(T − T_ref))' : ''}`}
         {' '}· unit cell Z = {Z}
       </p>

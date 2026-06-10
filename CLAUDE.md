@@ -98,6 +98,7 @@ JSON response  {status, rho_kgm3 | P_GPa}
 
 - **Local dev**: `SEAFREEZE_PYTHON=/Users/hiroki/anaconda3/bin/python` in `.env.local`
 - **Vercel**: `api/seafreeze.py` (Python serverless function) takes routing priority over the Next.js route handler because Vercel serves custom `api/` functions before framework routes
+- **vercel.json**: do NOT add a `functions` key — Vercel auto-detects `api/*.py` when `requirements.txt` exists. Explicit `"runtime": "@vercel/python@4"` causes a build error ("must have a valid version")
 - **SeaFreeze Python package** is at `/Users/hiroki/anaconda3/lib/python3.11/site-packages/seafreeze/`
 - The `.mat` spline data file is bundled inside the seafreeze package: `SeaFreeze_Gibbs_VII_NaCl.mat`
 
@@ -126,8 +127,8 @@ SeaFreeze pressure is in **MPa**; the app uses **GPa**. Multiply/divide by 1000.
 
 Key types:
 ```typescript
-type EoSType = 'BM3' | 'Vinet' | 'AP1' | 'SeaFreeze';
-type IcePolymorph = 'Ih' | 'II' | 'III' | 'V' | 'VI' | 'VII' | 'VIII';
+type EoSType = 'BM3' | 'Vinet' | 'AP1' | 'SeaFreeze' | 'FortesPowerExp' | 'Murnaghan' | 'VinetAG' | 'BM3Thermal';
+type IcePolymorph = 'Ih' | 'II' | 'III' | 'V' | 'VI' | 'VII' | 'VIII' | 'X';
 
 interface EoSParameters {
   V0: number;           // cm³/mol — always this unit for computation
@@ -137,7 +138,10 @@ interface EoSParameters {
   P_ref: number;        // GPa
   K0: number;           // GPa
   K0p: number;          // dimensionless
-  alpha: number;        // K⁻¹ (0 for isothermal)
+  alpha: number;        // K⁻¹ (0 for isothermal; α₀ for VinetAG/BM3Thermal)
+  alpha1?: number;      // K⁻², quadratic thermal expansion (BM3Thermal)
+  dKdT?: number;        // GPa/K, T-dependence of K₀ (BM3Thermal)
+  deltaT?: number;      // Anderson-Grüneisen δ_T (VinetAG only)
 }
 
 interface LiteratureEntry {
@@ -160,8 +164,10 @@ interface LiteratureEntry {
 - **Ice III H₂O**: Journaux et al. (2020) [SeaFreeze], Lobban et al. (2000)
 - **Ice V H₂O**: Journaux et al. (2020) [SeaFreeze], Lobban et al. (1998), Fortes et al. (2014)
 - **Ice VI H₂O**: Journaux et al. (2020) [SeaFreeze], Bezacier et al. (2014), Fortes et al. (2012)
-- **Ice VII H₂O**: Fei et al. (1993), Hemley et al. (1987), Sugimura et al. (2008)
+- **Ice VII H₂O**: Bezacier et al. (2014), Fei et al. (1993), Frank et al. (2004), Grande et al. (2022) ×3, Hemley et al. (1987), Lai et al. (2022) ×3 (BM3Thermal + BM3 300K + Vinet 300K), Loubeyre et al. (1999), Somayazulu et al. (2008), Sugimura et al. (2008), Sugimura et al. (2010), Wolanin et al. (1997) BM3 + Vinet
 - **Ice VII D₂O**: Klotz et al. (2017) BM3 + Vinet — isothermal at 298 K, V₀ = 42.25 Å³
+- **Ice VIII H₂O**: Fukui et al. (2022) BM3 isothermal at 10 K, 120 K, 300 K, Room T — Table I
+- **Ice VIII D₂O**: Klotz et al. (2017) BM3 + Vinet + AP1 at 93 K and 196 K
 
 **Previously hallucinated and deleted**: `vi_d2o_klotz2009`, `vii_d2o_klotz2009` — these do not exist.
 

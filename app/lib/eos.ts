@@ -1,4 +1,4 @@
-import type { EoSParameters, EoSType, FortesPowerExpParams } from './literature';
+import type { EoSParameters, EoSType, FortesPowerExpParams, MurnaghanParams } from './literature';
 
 function effectiveV0(T: number, params: EoSParameters): number {
   return params.V0 * (1 + params.alpha * (T - params.T_ref));
@@ -33,6 +33,25 @@ function calcPressure(V: number, V0eff: number, K0: number, K0p: number, eosType
   return bm3Pressure(V, V0eff, K0, K0p);
 }
 
+// Isothermal bulk modulus from the Vinet EoS: K_T = -V·dP/dV
+// Derived analytically: K_T = (K₀/X²)·exp[c(1-X)]·(2 - X + c·X·(1-X))
+// where c = (3/2)(K₀'-1), X = (V/V₀)^(1/3)
+function vinetBulkModulus(V: number, V0: number, K0: number, K0p: number): number {
+  const X = Math.pow(V / V0, 1 / 3);
+  const c = (3 / 2) * (K0p - 1);
+  return (K0 / (X * X)) * Math.exp(c * (1 - X)) * (2 - X + c * X * (1 - X));
+}
+
+// Vinet + Anderson-Grüneisen thermal pressure EoS (Sugimura 2010)
+// P(V,T) = P_Vinet(V,T₀) + α₀·(V/V₀)^δ_T · K_T_Vinet(V) · (T − T₀)
+// α(P) = α₀·(V/V₀)^δ_T; thermal pressure = ∫α·K_T dT ≈ α(V)·K_T(V)·ΔT
+function vinetAGPressure(V: number, T: number, params: EoSParameters): number {
+  const P_iso = vinetPressure(V, params.V0, params.K0, params.K0p);
+  const KT   = vinetBulkModulus(V, params.V0, params.K0, params.K0p);
+  const P_th = params.alpha * Math.pow(V / params.V0, params.deltaT ?? 0) * KT * (T - params.T_ref);
+  return P_iso + P_th;
+}
+
 export interface CalcResult {
   V: number; // cm³/mol
   P: number; // GPa
@@ -42,6 +61,13 @@ export interface CalcResult {
 export function computePressure(T: number, V: number, params: EoSParameters, eosType: EoSType = 'BM3'): CalcResult {
   if (T <= 0) throw new Error('Temperature must be positive (K).');
   if (V <= 0) throw new Error('Volume must be positive (cm³/mol).');
+  if (eosType === 'VinetAG') return { V, P: vinetAGPressure(V, T, params) };
+  if (eosType === 'BM3Thermal') {
+    const dT = T - params.T_ref;
+    const V0T = params.V0 * (1 + params.alpha * dT + 0.5 * (params.alpha1 ?? 0) * dT * dT);
+    const K0T = params.K0 + (params.dKdT ?? 0) * dT;
+    return { V, P: bm3Pressure(V, V0T, K0T, params.K0p) };
+  }
   const P = calcPressure(V, effectiveV0(T, params), params.K0, params.K0p, eosType);
   return { V, P };
 }
@@ -49,6 +75,48 @@ export function computePressure(T: number, V: number, params: EoSParameters, eos
 // T, P → V  (bisection — P is monotonically decreasing in V for both BM3 and Vinet)
 export function computeVolume(T: number, P_target: number, params: EoSParameters, eosType: EoSType = 'BM3'): CalcResult {
   if (T <= 0) throw new Error('Temperature must be positive (K).');
+
+  // BM3Thermal: temperature-dependent V₀ and K₀ (Berman 1988 formalism)
+  if (eosType === 'BM3Thermal') {
+    const dT = T - params.T_ref;
+    const V0T = params.V0 * (1 + params.alpha * dT + 0.5 * (params.alpha1 ?? 0) * dT * dT);
+    const K0T = params.K0 + (params.dKdT ?? 0) * dT;
+    let Vlo = V0T * 0.10;
+    let Vhi = V0T * 5.00;
+    const Plo = bm3Pressure(Vlo, V0T, K0T, params.K0p);
+    const Phi = bm3Pressure(Vhi, V0T, K0T, params.K0p);
+    if (P_target > Plo)
+      throw new Error(`P = ${P_target} GPa exceeds BM3Thermal range at this T (max ≈ ${Plo.toFixed(1)} GPa).`);
+    if (P_target < Phi)
+      throw new Error(`P = ${P_target} GPa is below BM3Thermal range (tensile limit ≈ ${Phi.toFixed(2)} GPa).`);
+    for (let i = 0; i < 300; i++) {
+      const Vmid = (Vlo + Vhi) / 2;
+      if (bm3Pressure(Vmid, V0T, K0T, params.K0p) > P_target) Vlo = Vmid; else Vhi = Vmid;
+      if ((Vhi - Vlo) / V0T < 1e-12) break;
+    }
+    return { V: (Vlo + Vhi) / 2, P: P_target };
+  }
+
+  // VinetAG: bisect on [0.1·V₀, V₀]; monotonically decreasing in this compressed range
+  if (eosType === 'VinetAG') {
+    const V0 = params.V0;
+    const Vlo0 = V0 * 0.10;
+    const Vhi0 = V0;
+    const Plo = vinetAGPressure(Vlo0, T, params);
+    const Phi = vinetAGPressure(Vhi0, T, params);
+    if (P_target > Plo)
+      throw new Error(`P = ${P_target} GPa exceeds VinetAG range at this T (max ≈ ${Plo.toFixed(1)} GPa).`);
+    if (P_target < Phi)
+      throw new Error(`P = ${P_target} GPa is below VinetAG range at this T (min ≈ ${Phi.toFixed(2)} GPa).`);
+    let Vlo = Vlo0, Vhi = Vhi0;
+    for (let i = 0; i < 300; i++) {
+      const Vmid = (Vlo + Vhi) / 2;
+      if (vinetAGPressure(Vmid, T, params) > P_target) Vlo = Vmid; else Vhi = Vmid;
+      if ((Vhi - Vlo) / V0 < 1e-12) break;
+    }
+    return { V: (Vlo + Vhi) / 2, P: P_target };
+  }
+
   const V0eff = effectiveV0(T, params);
 
   let Vlo = V0eff * 0.10;
@@ -103,4 +171,30 @@ export function computeVolumeFortes(T: number, fp: FortesPowerExpParams): number
   if (T <= 0) throw new Error('Temperature must be positive (K).');
   if (T > 275) throw new Error('Model valid up to 270 K.');
   return fp.V0 * Math.exp(integrateFortesAlpha(T, fp.p, fp.q, fp.r, fp.s));
+}
+
+// Murnaghan PVT EoS — Fortes et al. (2012) form
+// V(P,T) = V_ref(T) / [P*·(K'/K(T)) + 1]^(1/K')  where P* = P − P_ref
+// V_ref(T) = V_ref + X1·T* + X2·T*²               T* = T − T_ref
+// K(T)     = K_ref + dKdT·T*
+export function computeVolumeMurnaghan(T: number, P: number, mp: MurnaghanParams): number {
+  if (T <= 0) throw new Error('Temperature must be positive (K).');
+  const Tstar = T - mp.T_ref;
+  const Vt = mp.V_ref + mp.X1 * Tstar + mp.X2 * Tstar * Tstar;
+  const Kt = mp.K_ref + mp.dKdT * Tstar;
+  if (Kt <= 0) throw new Error('K(T) ≤ 0 at this temperature — outside model range.');
+  const Pstar = P - mp.P_ref;
+  const base = Pstar * (mp.Kp / Kt) + 1;
+  if (base <= 0) throw new Error(`P = ${P} GPa is outside Murnaghan model range.`);
+  return Vt / Math.pow(base, 1 / mp.Kp);
+}
+
+export function computePressureMurnaghan(T: number, V: number, mp: MurnaghanParams): number {
+  if (T <= 0) throw new Error('Temperature must be positive (K).');
+  if (V <= 0) throw new Error('Volume must be positive (cm³/mol).');
+  const Tstar = T - mp.T_ref;
+  const Vt = mp.V_ref + mp.X1 * Tstar + mp.X2 * Tstar * Tstar;
+  const Kt = mp.K_ref + mp.dKdT * Tstar;
+  if (Kt <= 0) throw new Error('K(T) ≤ 0 at this temperature — outside model range.');
+  return mp.P_ref + (Kt / mp.Kp) * (Math.pow(Vt / V, mp.Kp) - 1);
 }
