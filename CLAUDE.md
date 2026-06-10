@@ -34,9 +34,12 @@ Without `--webpack`, vanilla-extract throws a runtime error:
 
 ```
 app/
-  page.tsx                  Server component — renders <App />
+  page.tsx                  Server component — renders <App />; exports page metadata
   page.css.ts               App-level layout styles (vanilla-extract)
   globals.css               Global reset
+  layout.tsx                Root layout; exports site-wide Metadata (metadataBase, OG, Twitter)
+  sitemap.ts                Generates /sitemap.xml (Next.js App Router convention)
+  robots.ts                 Generates /robots.txt (Next.js App Router convention)
   api/
     seafreeze/
       route.ts              Local-dev API route — spawns Python subprocess
@@ -176,6 +179,12 @@ interface FortesPowerExpParams {
   p: number; q: number; r: number; s: number; // see eos.ts
 }
 
+// RottgerPolynomial: V_cell(T) = Σ A[i]·T^i  (polynomial, P = 0 only)
+interface RottgerPolynomialParams {
+  A: [number×9]; // A0..A8 in Å³/K^i
+  Z: number;     // formula units per unit cell
+}
+
 // Murnaghan PVT (Fortes et al. 2012 form)
 // V(P,T) = V_ref(T) / [P*(K'/K(T))+1]^(1/K')
 interface MurnaghanParams {
@@ -183,6 +192,16 @@ interface MurnaghanParams {
   K_ref: number; dKdT: number; Kp: number; // GPa, GPa/K, dimensionless
   P_ref: number; T_ref: number;            // GPa, K
 }
+
+// BM3FrankPVT: BM3 isothermal + thermal expansion pressure correction (Frank et al. 2004)
+// V(P,T) = V_BM3(P,T_ref) × exp{[a₀ΔT + (a₁/2)(T²−T_ref²)] / (1 + (K0p/K0)·P)^eta}
+interface FrankPVTParams {
+  V0: number; K0: number; K0p: number; T_ref: number; // cm³/mol, GPa, dim., K
+  a0: number; a1: number; eta: number;                // K⁻¹, K⁻², dim.
+  P_min: number; P_max: number;                       // GPa bisection bounds
+}
+
+// FeistelWagner: no params — uses built-in IAPWS-2006 Gibbs coefficients (H₂O ice Ih only)
 ```
 
 ### LiteratureEntry
@@ -195,10 +214,12 @@ interface LiteratureEntry {
   doi?: string;       // DOI without "https://doi.org/" prefix
   eosType: EoSType;
   molecule: 'H2O' | 'D2O';
-  params?: ReportedEoSParameters;      // present for BM3/Vinet/AP1/VinetAG/BM3Thermal
-  fortesParams?: FortesPowerExpParams; // present for FortesPowerExp
-  murnaghanParams?: MurnaghanParams;   // present for Murnaghan
-  seafreezePhase?: string;             // 'II'|'III'|'V'|'VI' for SeaFreeze entries
+  params?: ReportedEoSParameters;           // present for BM3/Vinet/AP1/VinetAG/BM3Thermal
+  fortesParams?: FortesPowerExpParams;      // present for FortesPowerExp
+  murnaghanParams?: MurnaghanParams;        // present for Murnaghan
+  rottgerParams?: RottgerPolynomialParams;  // present for RottgerPolynomial
+  frankPVTParams?: FrankPVTParams;          // present for BM3FrankPVT
+  seafreezePhase?: string;                  // 'II'|'III'|'V'|'VI' for SeaFreeze entries
   isothermal?: boolean;                // true → T input disabled, shows "T K (fixed)"
   notes?: string;                      // shown in UI; include the key formula(s) used
 }
@@ -209,7 +230,8 @@ interface LiteratureEntry {
 See README.md for the full list of EoS entries currently in the database.
 
 **Not in the database (do not add without source)**: Lobban et al. for ice II/III/V; any Klotz 2009 entries.  
-**Previously hallucinated and deleted**: `vi_d2o_klotz2009`, `vii_d2o_klotz2009`, `v_h2o_fortes2014` (Fortes has no published EoS for ice V), `vi_h2o_fortes2012` (Fortes 2012 has D₂O only; no H₂O EoS for ice VI).
+**Previously hallucinated and deleted**: `vi_d2o_klotz2009`, `vii_d2o_klotz2009`.  
+**Note**: `v_h2o_fortes2014` (ice V H₂O BM3) and `vi_h2o_fortes2012` (ice VI H₂O BM3) ARE in the database with real citations.
 
 ## Unit constants
 
@@ -232,7 +254,7 @@ Only edit `.css.ts` files for style changes — never inline styles.
 1. **Do not use Turbopack** — always `--webpack`
 2. **SeaFreeze phase names** are `'II'`, `'III'`, `'V'`, `'VI'` (no `'Ice '` prefix)
 3. **Pressure units**: app = GPa, SeaFreeze = MPa — multiply by 1000 when calling SeaFreeze
-4. **`params` is optional** — SeaFreeze/FortesPowerExp/Murnaghan entries have `params: undefined`; always guard before accessing
+4. **`params` is optional** — SeaFreeze/FortesPowerExp/Murnaghan/RottgerPolynomial/BM3FrankPVT/FeistelWagner entries have `params: undefined`; always guard before accessing
 5. **`isothermal: true`** entries omit `alpha` in `ReportedEoSParameters` — `resolveParams` resolves it to `0`; do NOT apply thermal correction
 6. **`params` fields are `{ value: string, unit }` not plain numbers** — never read `entry.params.K0` directly; call `resolveParams(entry.params, Z, M)` first to get `EoSParameters`
 7. **Parenthetical uncertainty** in `value` strings (e.g. `"14.6(14)"`) is stripped by `parseParamValue()` — central value only is used for computation

@@ -442,10 +442,10 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'D2O',
       // Table 4, unit-cell volume column. Z=10, V_cell[Å³] / (10×1.66054) → cm³/mol.
       // V_1.25,225 = 214.94 Å³ → 12.944 cm³/mol
-      // X1 = 6.1×10⁻² Å³/K → 3.673×10⁻³ cm³/mol/K
+      // X1 = 3.47×10⁻² Å³/K → 2.090×10⁻³ cm³/mol/K
       // X2 = 6.1×10⁻⁵ Å³/K² → 3.673×10⁻⁶ cm³/mol/K²
       murnaghanParams: {
-        V_ref: 12.944, X1: 3.673e-3, X2: 3.673e-6,
+        V_ref: 12.944, X1: 2.090e-3, X2: 3.673e-6,
         K_ref: 21.7, dKdT: -0.015, Kp: 4.4,
         P_ref: 1.25, T_ref: 225,
       },
