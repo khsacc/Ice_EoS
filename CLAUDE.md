@@ -5,7 +5,7 @@
 ## What this project is
 
 A Next.js (TypeScript) web application that calculates equations of state (EoS) for ice polymorphs. Hosted on Vercel. Allows users to:
-- Select an ice polymorph (Ih, II, III, V, VI, VII, VIII) and molecule (H₂O / D₂O) from a sidebar
+- Select an ice polymorph (Ih, II, III, V, VI, VII, VIII, X) and molecule (H₂O / D₂O) from a sidebar
 - Choose a literature reference for the EoS
 - Switch between two tabs: **T, P → V** and **T, V → P**
 - Get instant results in four volume/density units simultaneously
@@ -43,17 +43,22 @@ app/
                             On Vercel this path is overridden by api/seafreeze.py
   components/
     App.tsx                 Client root — molecule + polymorph state
-    Header.tsx
-    Sidebar.tsx / .css.ts   H₂O / D₂O sections, polymorph buttons
+    Header.tsx              Sticky header; accepts navLink prop to swap the nav link
+    Footer.tsx / .css.ts    Sitewide footer with Calculator + Reference List links
+    Sidebar.tsx / .css.ts   H₂O / D₂O sections, polymorph buttons (hides phases with no entries)
     EosCalculator.tsx       Tab switcher
     TabTPtoV.tsx            T,P→V tab (instant calc via useEffect)
     TabTVtoP.tsx            T,V→P tab (instant calc via useEffect)
     LiteratureSelect.tsx    Reference dropdown
     Tab.css.ts              Shared tab styles
   lib/
-    literature.ts           All EoS data, polymorph constants, LITERATURE record
+    literature.ts           EoS data (LITERATURE record), polymorph constants, LiteratureEntry types
+    paramUnits.ts           ReportedEoSParameters → EoSParameters conversion; unit type definitions
     eos.ts                  BM3, Vinet, AP1 EoS functions + bisection solver
     units.ts                Unit conversion (K/°C, cm³/mol/Å³/g·cm⁻³/kg·m⁻³)
+  references/
+    page.tsx                Reference list page (Server Component; uses Header + Footer)
+    page.css.ts
 api/
   seafreeze.py              Vercel Python serverless function (production)
 scripts/
@@ -121,55 +126,88 @@ SeaFreeze pressure is in **MPa**; the app uses **GPa**. Multiply/divide by 1000.
 | V   | 400–620 MPa |
 | VI  | 600–2300 MPa |
 
-## Literature data (app/lib/literature.ts)
+## Literature data (app/lib/literature.ts + app/lib/paramUnits.ts)
 
-`LITERATURE` is a `Record<IcePolymorph, LiteratureEntry[]>`.  
+`LITERATURE` is a `Record<IcePolymorph, LiteratureEntry[]>`.
 
-Key types:
+### Two-layer parameter design
+
+Parameters are stored in two forms:
+
+**`ReportedEoSParameters`** (in `paramUnits.ts`) — stored in `literature.ts` exactly as printed in the source paper. Each field is `{ value: string, unit: '...' }`. The `value` string accepts parenthetical last-digit uncertainty notation (e.g. `"42.25(2)"` → 42.25).
+
+**`EoSParameters`** (in `paramUnits.ts`) — computation-ready, all canonical units (GPa, cm³/mol, K, K⁻¹). Obtained at runtime via `resolveParams(rp, Z, M)`, which strips uncertainty, converts units, and applies Z/M for cell-volume → molar-volume conversion.
+
 ```typescript
-type EoSType = 'BM3' | 'Vinet' | 'AP1' | 'SeaFreeze' | 'FortesPowerExp' | 'Murnaghan' | 'VinetAG' | 'BM3Thermal';
-type IcePolymorph = 'Ih' | 'II' | 'III' | 'V' | 'VI' | 'VII' | 'VIII' | 'X';
-
-interface EoSParameters {
-  V0: number;           // cm³/mol — always this unit for computation
-  V0_reported?: number; // as printed in paper (e.g. 42.25 Å³)
-  V0_unit?: VolumeUnit; // unit of V0_reported ('cell' | 'gcm3' | 'kgm3')
-  T_ref: number;        // K
-  P_ref: number;        // GPa
-  K0: number;           // GPa
-  K0p: number;          // dimensionless
-  alpha: number;        // K⁻¹ (0 for isothermal; α₀ for VinetAG/BM3Thermal)
-  alpha1?: number;      // K⁻², quadratic thermal expansion (BM3Thermal)
-  dKdT?: number;        // GPa/K, T-dependence of K₀ (BM3Thermal)
-  deltaT?: number;      // Anderson-Grüneisen δ_T (VinetAG only)
+// paramUnits.ts — stored in literature entries
+interface ReportedEoSParameters {
+  V0:      { value: string; unit: 'cm3/mol' | 'A3/cell' | 'g/cm3' | 'kg/m3' };
+  K0:      { value: string; unit: 'GPa' | 'MPa' | 'kbar' };
+  K0p:     { value: string; unit: '1' };
+  T_ref:   { value: string; unit: 'K' | 'C' };
+  P_ref:   { value: string; unit: 'GPa' | 'MPa' | 'kbar' };
+  alpha?:  { value: string; unit: 'K-1' | '10-5/K' | '10-6/K' };   // omit for isothermal
+  alpha1?: { value: string; unit: 'K-2' | '10-6/K2' | '10-8/K2' }; // BM3Thermal only
+  dKdT?:   { value: string; unit: 'GPa/K' | 'MPa/K' };             // BM3Thermal only
+  deltaT?: { value: string; unit: '1' };                            // VinetAG only
 }
 
+// paramUnits.ts — resolved at runtime for computation
+interface EoSParameters {
+  V0: number;      // cm³/mol
+  T_ref: number;   // K
+  P_ref: number;   // GPa
+  K0: number;      // GPa
+  K0p: number;     // dimensionless
+  alpha: number;   // K⁻¹ (0 when no alpha field in reported params)
+  alpha1?: number; // K⁻² (BM3Thermal)
+  dKdT?: number;   // GPa/K (BM3Thermal)
+  deltaT?: number; // dimensionless (VinetAG)
+}
+```
+
+### Specialty parameter types (not EoS-pressure entries)
+
+```typescript
+// FortesPowerExp: α(T) = p·T^(q/T) + r·exp(s/T), V(T) = V₀·exp(∫α dT), P = 0 only
+interface FortesPowerExpParams {
+  V0: number;      // cm³/mol (fitted T=0 parameter)
+  V0_cell: number; // Å³ (as reported)
+  p: number; q: number; r: number; s: number; // see eos.ts
+}
+
+// Murnaghan PVT (Fortes et al. 2012 form)
+// V(P,T) = V_ref(T) / [P*(K'/K(T))+1]^(1/K')
+interface MurnaghanParams {
+  V_ref: number; X1: number; X2: number; // cm³/mol, cm³/mol/K, cm³/mol/K²
+  K_ref: number; dKdT: number; Kp: number; // GPa, GPa/K, dimensionless
+  P_ref: number; T_ref: number;            // GPa, K
+}
+```
+
+### LiteratureEntry
+
+```typescript
 interface LiteratureEntry {
   id: string;
+  citation: string;   // short label for dropdowns (e.g. "Klotz et al. (2017) BM3")
+  fullRef: string;    // full bibliographic string for Reference List page
+  doi?: string;       // DOI without "https://doi.org/" prefix
   eosType: EoSType;
   molecule: 'H2O' | 'D2O';
-  params?: EoSParameters;  // undefined for SeaFreeze entries
-  seafreezePhase?: string; // 'II' | 'III' | 'V' | 'VI'
-  isothermal?: boolean;    // disables T input, shows "298 K (fixed)"
+  params?: ReportedEoSParameters;      // present for BM3/Vinet/AP1/VinetAG/BM3Thermal
+  fortesParams?: FortesPowerExpParams; // present for FortesPowerExp
+  murnaghanParams?: MurnaghanParams;   // present for Murnaghan
+  seafreezePhase?: string;             // 'II'|'III'|'V'|'VI' for SeaFreeze entries
+  isothermal?: boolean;                // true → T input disabled, shows "T K (fixed)"
   notes?: string;
 }
 ```
 
-### Real entries (verified against papers) — do NOT hallucinate new ones
+See README.md for the full list of EoS entries currently in the database.
 
-- **Ice Ih H₂O**: Feistel & Wagner (2006), Röttger et al. (1994)
-- **Ice Ih D₂O**: Röttger et al. (1994)
-- **Ice II H₂O**: Journaux et al. (2020) [SeaFreeze], Lobban et al. (2002)
-- **Ice II D₂O**: Fortes et al. (2006)
-- **Ice III H₂O**: Journaux et al. (2020) [SeaFreeze], Lobban et al. (2000)
-- **Ice V H₂O**: Journaux et al. (2020) [SeaFreeze], Lobban et al. (1998), Fortes et al. (2014)
-- **Ice VI H₂O**: Journaux et al. (2020) [SeaFreeze], Bezacier et al. (2014), Fortes et al. (2012)
-- **Ice VII H₂O**: Bezacier et al. (2014), Fei et al. (1993), Frank et al. (2004), Grande et al. (2022) ×3, Hemley et al. (1987), Lai et al. (2022) ×3 (BM3Thermal + BM3 300K + Vinet 300K), Loubeyre et al. (1999), Somayazulu et al. (2008), Sugimura et al. (2008), Sugimura et al. (2010), Wolanin et al. (1997) BM3 + Vinet
-- **Ice VII D₂O**: Klotz et al. (2017) BM3 + Vinet — isothermal at 298 K, V₀ = 42.25 Å³
-- **Ice VIII H₂O**: Fukui et al. (2022) BM3 isothermal at 10 K, 120 K, 300 K, Room T — Table I
-- **Ice VIII D₂O**: Klotz et al. (2017) BM3 + Vinet + AP1 at 93 K and 196 K
-
-**Previously hallucinated and deleted**: `vi_d2o_klotz2009`, `vii_d2o_klotz2009` — these do not exist.
+**Not in the database (do not add without source)**: Lobban et al. for ice II/III/V; any Klotz 2009 entries.  
+**Previously hallucinated and deleted**: `vi_d2o_klotz2009`, `vii_d2o_klotz2009`.
 
 ## Unit constants
 
@@ -192,7 +230,8 @@ Only edit `.css.ts` files for style changes — never inline styles.
 1. **Do not use Turbopack** — always `--webpack`
 2. **SeaFreeze phase names** are `'II'`, `'III'`, `'V'`, `'VI'` (no `'Ice '` prefix)
 3. **Pressure units**: app = GPa, SeaFreeze = MPa — multiply by 1000 when calling SeaFreeze
-4. **`params` is optional** in `LiteratureEntry` — SeaFreeze entries have `params: undefined`; guard before accessing
-5. **`isothermal: true`** entries have `alpha: 0` — do NOT apply thermal correction for these
-6. **V₀_reported** and **V₀_unit** are display-only; all EoS computations use `V0` (cm³/mol)
-7. **Klotz et al. 2017** is ice VII D₂O at 298 K; Table III gives BM3 (K₀=13.8, K₀′=5.9) and Vinet (K₀=13.6, K₀′=6.2)
+4. **`params` is optional** — SeaFreeze/FortesPowerExp/Murnaghan entries have `params: undefined`; always guard before accessing
+5. **`isothermal: true`** entries omit `alpha` in `ReportedEoSParameters` — `resolveParams` resolves it to `0`; do NOT apply thermal correction
+6. **`params` fields are `{ value: string, unit }` not plain numbers** — never read `entry.params.K0` directly; call `resolveParams(entry.params, Z, M)` first to get `EoSParameters`
+7. **Parenthetical uncertainty** in `value` strings (e.g. `"14.6(14)"`) is stripped by `parseParamValue()` — central value only is used for computation
+8. **Klotz et al. 2017 ice VII D₂O**: V₀ = 42.25 Å³/cell (unit `'A3/cell'`), isothermal 298 K; BM3 K₀=13.8 K₀′=5.9, Vinet K₀=13.6 K₀′=6.2
