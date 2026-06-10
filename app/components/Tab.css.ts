@@ -6,6 +6,7 @@ export const inputGrid = style({
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
   gap: 16,
+  alignItems: 'end',
 });
 
 export const fieldWrapper = style({ display: 'flex', flexDirection: 'column', gap: 4 });

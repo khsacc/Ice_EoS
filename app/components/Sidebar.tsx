@@ -1,5 +1,5 @@
 'use client';
-import { POLYMORPHS, POLYMORPH_LABELS, MOLECULE_LABELS } from '../lib/literature';
+import { POLYMORPHS, POLYMORPH_LABELS, MOLECULE_LABELS, LITERATURE } from '../lib/literature';
 import type { IcePolymorph, Molecule } from '../lib/literature';
 import * as styles from './Sidebar.css';
 
@@ -19,7 +19,9 @@ export default function Sidebar({ molecule, polymorph, onSelect }: Props) {
           <div key={mol}>
             {i > 0 && <div className={styles.sectionDivider} />}
             <p className={styles.sectionHeader}>{MOLECULE_LABELS[mol]}</p>
-            {POLYMORPHS.map((p) => (
+            {POLYMORPHS.filter((p) =>
+              LITERATURE[p]?.some((e) => e.molecule === mol)
+            ).map((p) => (
               <button
                 key={p}
                 onClick={() => onSelect(mol, p)}

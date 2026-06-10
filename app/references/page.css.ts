@@ -64,6 +64,7 @@ export const entryMeta = style({
   alignItems: 'center',
   gap: 10,
   flexWrap: 'wrap',
+  marginTop: 6,
 });
 
 export const badge = style({
@@ -78,9 +79,11 @@ export const badge = style({
 });
 
 export const doiLink = style({
+  display: 'block',
   fontSize: 12,
   color: '#0061a4',
   textDecoration: 'none',
+  marginBottom: 2,
   ':hover': { textDecoration: 'underline' },
 });
 
@@ -91,13 +94,3 @@ export const notes = style({
   fontStyle: 'italic',
 });
 
-export const backLink = style({
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 14,
-  color: '#0061a4',
-  textDecoration: 'none',
-  marginBottom: 32,
-  ':hover': { textDecoration: 'underline' },
-});

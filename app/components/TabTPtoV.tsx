@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { LITERATURE, POLYMORPH_LABELS, MOLECULE_LABELS, POLYMORPH_Z, MOLAR_MASS } from '../lib/literature';
 import { computeVolume, computeVolumeFortes, computeVolumeMurnaghan } from '../lib/eos';
 import type { IcePolymorph, Molecule } from '../lib/literature';
@@ -8,6 +8,11 @@ import {
   TEMP_UNIT_LABELS, VOLUME_UNIT_LABELS, VOLUME_UNITS, VOLUME_UNIT_DECIMALS,
   toKelvin, fromMolar,
 } from '../lib/units';
+import {
+  resolveParams,
+  PRESSURE_UNIT_LABELS, VOLUME_PARAM_UNIT_LABELS, TEMP_PARAM_UNIT_LABELS,
+  ALPHA_UNIT_LABELS, ALPHA1_UNIT_LABELS, DKDT_UNIT_LABELS,
+} from '../lib/paramUnits';
 import LiteratureSelect from './LiteratureSelect';
 import * as s from './Tab.css';
 
@@ -39,6 +44,12 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
   const Z = POLYMORPH_Z[polymorph];
   const M = MOLAR_MASS[molecule];
   const outputUnits: VolumeUnit[] = VOLUME_UNITS;
+
+  // Resolve reported string params → numeric EoSParameters for computation + display
+  const resolvedParams = useMemo(
+    () => selected.params ? resolveParams(selected.params, Z, M) : undefined,
+    [selected, Z, M],
+  );
 
   useEffect(() => {
     if (isIsothermal) setT('');
@@ -78,7 +89,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
     if (isNaN(Pval)) { setResult(null); setError(null); setLoading(false); return; }
 
     const T_K = isIsothermal
-      ? selected.params?.T_ref ?? 0
+      ? resolvedParams?.T_ref ?? 0
       : (() => {
           if (T.trim() === '') return null;
           const v = parseFloat(T);
@@ -130,9 +141,9 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
         });
       return () => { ctrl.abort(); };
     } else {
-      // Synchronous BM3 / Vinet / AP1
+      // Synchronous BM3 / Vinet / AP1 / VinetAG / BM3Thermal
       try {
-        const res = computeVolume(T_K, Pval, selected.params!, selected.eosType);
+        const res = computeVolume(T_K, Pval, resolvedParams!, selected.eosType);
         setResult({ V: res.V });
         setError(null);
       } catch (e) {
@@ -141,7 +152,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
       }
       setLoading(false);
     }
-  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, isFortesPowerExp, isMurnaghan, isVinetAG, isBM3Thermal, M]);
+  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, isFortesPowerExp, isMurnaghan, isVinetAG, isBM3Thermal, M, resolvedParams]);
 
   if (entries.length === 0) {
     return (
@@ -151,21 +162,20 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
     );
   }
 
-  // V0 display for BM3/Vinet
+  // V₀ display: show value + unit as reported; append cm³/mol conversion when unit differs
   const v0Display = (() => {
-    if (!selected.params) return null;
-    const p = selected.params;
-    if (p.V0_reported != null && p.V0_unit && p.V0_unit !== 'molar') {
-      const unitLabel = ({ cell: 'Å³', gcm3: 'g/cm³', kgm3: 'kg/m³' } as Record<string, string>)[p.V0_unit] ?? p.V0_unit;
-      return `${p.V0_reported} ${unitLabel} (= ${p.V0.toFixed(3)} cm³/mol)`;
+    if (!selected.params || !resolvedParams) return null;
+    const rp = selected.params;
+    if (rp.V0.unit !== 'cm3/mol') {
+      return `${rp.V0.value} ${VOLUME_PARAM_UNIT_LABELS[rp.V0.unit]} (= ${resolvedParams.V0.toFixed(3)} cm³/mol)`;
     }
-    return `${p.V0} cm³/mol`;
+    return `${rp.V0.value} cm³/mol`;
   })();
 
-  const fixedTDisplay = isIsothermal && selected.params
+  const fixedTDisplay = isIsothermal && resolvedParams
     ? (tempUnit === 'K'
-        ? `${selected.params.T_ref} K (fixed)`
-        : `${(selected.params.T_ref - 273.15).toFixed(2)} °C (fixed)`)
+        ? `${resolvedParams.T_ref} K (fixed)`
+        : `${(resolvedParams.T_ref - 273.15).toFixed(2)} °C (fixed)`)
     : null;
 
   return (
@@ -198,24 +208,33 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
         ) : isVinetAG && selected.params ? (
           <>
             <strong>EoS parameters (Vinet + Anderson-Grüneisen):</strong>{' '}
-            V₀ = {v0Display} · T_ref = {selected.params.T_ref} K ·
-            K₀ = {selected.params.K0} GPa · K₀′ = {selected.params.K0p} ·
-            α₀ = {selected.params.alpha.toExponential(2)} K⁻¹ · δ_T = {selected.params.deltaT}
+            V₀ = {v0Display} ·{' '}
+            T_ref = {selected.params.T_ref.value} {TEMP_PARAM_UNIT_LABELS[selected.params.T_ref.unit]} ·
+            K₀ = {selected.params.K0.value} {PRESSURE_UNIT_LABELS[selected.params.K0.unit]} ·
+            K₀′ = {selected.params.K0p.value} ·
+            α₀ = {selected.params.alpha!.value} {ALPHA_UNIT_LABELS[selected.params.alpha!.unit]} ·
+            δ_T = {selected.params.deltaT!.value}
           </>
         ) : isBM3Thermal && selected.params ? (
           <>
             <strong>EoS parameters (BM3 thermal, Berman 1988):</strong>{' '}
-            V₀ = {v0Display} · T_ref = {selected.params.T_ref} K ·
-            K₀ = {selected.params.K0} GPa · K₀′ = {selected.params.K0p} ·
-            α₀ = {selected.params.alpha.toExponential(2)} K⁻¹ · α₁ = {(selected.params.alpha1 ?? 0).toExponential(2)} K⁻² ·
-            dK/dT = {selected.params.dKdT} GPa/K
+            V₀ = {v0Display} ·{' '}
+            T_ref = {selected.params.T_ref.value} {TEMP_PARAM_UNIT_LABELS[selected.params.T_ref.unit]} ·
+            K₀ = {selected.params.K0.value} {PRESSURE_UNIT_LABELS[selected.params.K0.unit]} ·
+            K₀′ = {selected.params.K0p.value} ·
+            α₀ = {selected.params.alpha!.value} {ALPHA_UNIT_LABELS[selected.params.alpha!.unit]} ·
+            α₁ = {selected.params.alpha1!.value} {ALPHA1_UNIT_LABELS[selected.params.alpha1!.unit]} ·
+            dK/dT = {selected.params.dKdT!.value} {DKDT_UNIT_LABELS[selected.params.dKdT!.unit]}
           </>
         ) : selected.params ? (
           <>
             <strong>EoS parameters ({selected.eosType}):</strong>{' '}
-            V₀ = {v0Display} · T_ref = {selected.params.T_ref} K ·
-            K₀ = {selected.params.K0} GPa · K₀′ = {selected.params.K0p}
-            {!isIsothermal && ` · α = ${selected.params.alpha.toExponential(1)} K⁻¹`}
+            V₀ = {v0Display} ·{' '}
+            T_ref = {selected.params.T_ref.value} {TEMP_PARAM_UNIT_LABELS[selected.params.T_ref.unit]} ·
+            K₀ = {selected.params.K0.value} {PRESSURE_UNIT_LABELS[selected.params.K0.unit]} ·
+            K₀′ = {selected.params.K0p.value}
+            {!isIsothermal && selected.params.alpha &&
+              ` · α = ${selected.params.alpha.value} ${ALPHA_UNIT_LABELS[selected.params.alpha.unit]}`}
           </>
         ) : null}
       </div>
@@ -253,8 +272,8 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
               isIsothermal
                 ? undefined
                 : tempUnit === 'K'
-                ? (isFortesPowerExp ? '200' : isMurnaghan ? String(selected.murnaghanParams!.T_ref) : (selected.params ? String(selected.params.T_ref) : '250'))
-                : (isFortesPowerExp ? '-73' : isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : (selected.params ? String(Math.round(selected.params.T_ref - 273.15)) : '-23'))
+                ? (isFortesPowerExp ? '200' : isMurnaghan ? String(selected.murnaghanParams!.T_ref) : (resolvedParams ? String(resolvedParams.T_ref) : '250'))
+                : (isFortesPowerExp ? '-73' : isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : (resolvedParams ? String(Math.round(resolvedParams.T_ref - 273.15)) : '-23'))
             }
           />
         </div>
@@ -270,7 +289,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
             disabled={isFortesPowerExp}
             value={isFortesPowerExp ? '0 (fixed)' : P}
             onChange={isFortesPowerExp ? undefined : (e) => setP(e.target.value)}
-            placeholder={isFortesPowerExp ? undefined : isMurnaghan ? String(selected.murnaghanParams!.P_ref) : (selected.params ? String(selected.params.P_ref) : '0.3')}
+            placeholder={isFortesPowerExp ? undefined : isMurnaghan ? String(selected.murnaghanParams!.P_ref) : (resolvedParams ? String(resolvedParams.P_ref) : '0.3')}
           />
         </div>
       </div>

@@ -1,15 +1,19 @@
 import Link from 'next/link';
 import * as styles from './Header.css';
 
-export default function Header() {
+interface Props {
+  navLink?: { href: string; label: string };
+}
+
+export default function Header({ navLink = { href: '/references', label: '→ Reference List' } }: Props) {
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
         <div className={styles.titleBlock}>
           <h1 className={styles.titleRow}>
-            <span className={styles.title}>Water Ice EoS Dictionary</span>
-            <Link href="/references" className={styles.titleRefLink}>
-              → Reference List
+            <Link href="/" className={styles.titleLink}>Water Ice EoS Dictionary</Link>
+            <Link href={navLink.href} className={styles.titleRefLink}>
+              {navLink.label}
             </Link>
           </h1>
           <p className={styles.subtitle}>

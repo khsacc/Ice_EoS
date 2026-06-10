@@ -1,21 +1,10 @@
-import type { VolumeUnit } from './units';
+import type { ReportedEoSParameters } from './paramUnits';
+
+// Re-export so callers (eos.ts, tab components) can keep importing from './literature'
+export type { EoSParameters, ReportedEoSParameters } from './paramUnits';
 
 export type IcePolymorph = 'Ih' | 'II' | 'III' | 'V' | 'VI' | 'VII' | 'VIII' | 'X';
 export type Molecule = 'H2O' | 'D2O';
-
-export interface EoSParameters {
-  V0: number;           // cm³/mol, for calculations (always this unit)
-  V0_reported?: number; // V₀ as printed in the paper
-  V0_unit?: VolumeUnit; // unit of V0_reported (default 'molar' = cm³/mol)
-  T_ref: number;        // K
-  P_ref: number;        // GPa
-  K0: number;           // GPa
-  K0p: number;          // dK/dP (dimensionless)
-  alpha: number;        // K⁻¹, volumetric thermal expansion coefficient (α₀ for VinetAG/BM3Thermal, 0 for isothermal)
-  alpha1?: number;      // K⁻², quadratic thermal expansion (BM3Thermal): α(T) = alpha + alpha1*(T-T_ref)
-  dKdT?: number;        // GPa/K, linear T-dependence of bulk modulus (BM3Thermal): K₀(T) = K0 + dKdT*(T-T_ref)
-  deltaT?: number;      // Anderson-Grüneisen parameter δ_T (VinetAG only)
-}
 
 export type EoSType = 'BM3' | 'Vinet' | 'AP1' | 'SeaFreeze' | 'FortesPowerExp' | 'Murnaghan' | 'VinetAG' | 'BM3Thermal';
 
@@ -54,10 +43,10 @@ export interface LiteratureEntry {
   doi?: string;
   eosType: EoSType;
   molecule: Molecule;
-  params?: EoSParameters;              // undefined for SeaFreeze / FortesPowerExp / Murnaghan entries
-  fortesParams?: FortesPowerExpParams; // defined only for FortesPowerExp entries
-  murnaghanParams?: MurnaghanParams;   // defined only for Murnaghan entries
-  seafreezePhase?: string;             // 'II' | 'III' | 'V' | 'VI' for SeaFreeze entries
+  params?: ReportedEoSParameters;        // undefined for SeaFreeze / FortesPowerExp / Murnaghan entries
+  fortesParams?: FortesPowerExpParams;   // defined only for FortesPowerExp entries
+  murnaghanParams?: MurnaghanParams;     // defined only for Murnaghan entries
+  seafreezePhase?: string;               // 'II' | 'III' | 'V' | 'VI' for SeaFreeze entries
   isothermal?: boolean;
   notes?: string;
 }
@@ -109,7 +98,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table II, Experiment row "Dynamically disordered ice X". K' fixed at 4.
-      params: { V0: 8.05, T_ref: 300, P_ref: 0, K0: 145, K0p: 4, alpha: 0 },
+      params: {
+        V0:    { value: '8.05',  unit: 'cm3/mol' },
+        T_ref: { value: '300',   unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '145',   unit: 'GPa' },
+        K0p:   { value: '4',     unit: '1' },
+      },
       notes: 'Table II, Experiment. Vinet EoS fit to data above ~63 GPa at 300 K. K₀′ fixed at 4. V₀ is a fitted parameter (not measured at 0 GPa).',
     },
   ],
@@ -122,7 +117,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'H2O',
       isothermal: true,
-      params: { V0: 12.030, T_ref: 10, P_ref: 0, K0: 30.8, K0p: 3.7, alpha: 0 },
+      params: {
+        V0:    { value: '12.030', unit: 'cm3/mol' },
+        T_ref: { value: '10',    unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '30.8',  unit: 'GPa' },
+        K0p:   { value: '3.7',   unit: '1' },
+      },
       notes: 'Table I, BM3 at 10 K. V₀ fixed from literature. Valid 9.8–53.0 GPa.',
     },
     {
@@ -133,7 +134,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'H2O',
       isothermal: true,
-      params: { V0: 12.129, T_ref: 120, P_ref: 0, K0: 26.7, K0p: 4.1, alpha: 0 },
+      params: {
+        V0:    { value: '12.129', unit: 'cm3/mol' },
+        T_ref: { value: '120',   unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '26.7',  unit: 'GPa' },
+        K0p:   { value: '4.1',   unit: '1' },
+      },
       notes: 'Table I, BM3 at 120 K. V₀ fixed from literature. Valid 9.0–52.6 GPa.',
     },
     {
@@ -144,7 +151,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'H2O',
       isothermal: true,
-      params: { V0: 12.730, T_ref: 300, P_ref: 0, K0: 18.1, K0p: 4.59, alpha: 0 },
+      params: {
+        V0:    { value: '12.730', unit: 'cm3/mol' },
+        T_ref: { value: '300',   unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '18.1',  unit: 'GPa' },
+        K0p:   { value: '4.59',  unit: '1' },
+      },
       notes: 'Table I, BM3 at 300 K. V₀ fixed from literature. Valid 4.4–78.2 GPa.',
     },
     {
@@ -156,7 +169,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // V₀ free fit = 12.63(9) cm³/mol. Combined with previous data below 30 GPa (Refs. 21 & 26 therein).
-      params: { V0: 12.63, T_ref: 300, P_ref: 0, K0: 14.8, K0p: 5.9, alpha: 0 },
+      params: {
+        V0:    { value: '12.63(9)', unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '14.8',    unit: 'GPa' },
+        K0p:   { value: '5.9',     unit: '1' },
+      },
       notes: 'Table I, BM3 at room T. Combined with refs 21 & 26 below 30 GPa; V₀ free fit.',
     },
     {
@@ -167,8 +186,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'D2O',
       isothermal: true,
-      // V0 = 160.35 Å³ (Table II/IV); Z = 8 → 160.35 / (8 × 1.66054) = 12.071 cm³/mol
-      params: { V0: 12.071, V0_reported: 160.35, V0_unit: 'cell', T_ref: 93, P_ref: 0, K0: 18.7, K0p: 5.7, alpha: 0 },
+      // V0 = 160.35 Å³ (Table II/IV); Z=8 → 160.35/(8×1.66054) = 12.071 cm³/mol
+      params: {
+        V0:    { value: '160.35', unit: 'A3/cell' },
+        T_ref: { value: '93',    unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '18.7',  unit: 'GPa' },
+        K0p:   { value: '5.7',   unit: '1' },
+      },
       notes: 'Table IV, BM3 fit at 93 K. V₀ = 160.35 Å³ imposed.',
     },
     {
@@ -179,7 +204,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'Vinet',
       molecule: 'D2O',
       isothermal: true,
-      params: { V0: 12.071, V0_reported: 160.35, V0_unit: 'cell', T_ref: 93, P_ref: 0, K0: 18.5, K0p: 6.0, alpha: 0 },
+      params: {
+        V0:    { value: '160.35', unit: 'A3/cell' },
+        T_ref: { value: '93',    unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '18.5',  unit: 'GPa' },
+        K0p:   { value: '6.0',   unit: '1' },
+      },
       notes: 'Table IV, Rydberg-Vinet fit at 93 K. V₀ = 160.35 Å³ imposed.',
     },
     {
@@ -190,7 +221,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'AP1',
       molecule: 'D2O',
       isothermal: true,
-      params: { V0: 12.071, V0_reported: 160.35, V0_unit: 'cell', T_ref: 93, P_ref: 0, K0: 18.6, K0p: 5.9, alpha: 0 },
+      params: {
+        V0:    { value: '160.35', unit: 'A3/cell' },
+        T_ref: { value: '93',    unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '18.6',  unit: 'GPa' },
+        K0p:   { value: '5.9',   unit: '1' },
+      },
       notes: 'Table IV, Holzapfel AP1 fit at 93 K. V₀ = 160.35 Å³ imposed.',
     },
     {
@@ -201,8 +238,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'D2O',
       isothermal: true,
-      // V0 = 164.05 Å³ (Table II/IV); Z = 8 → 164.05 / (8 × 1.66054) = 12.350 cm³/mol
-      params: { V0: 12.350, V0_reported: 164.05, V0_unit: 'cell', T_ref: 196, P_ref: 0, K0: 15.6, K0p: 6.2, alpha: 0 },
+      // V0 = 164.05 Å³ (Table II/IV); Z=8 → 164.05/(8×1.66054) = 12.350 cm³/mol
+      params: {
+        V0:    { value: '164.05', unit: 'A3/cell' },
+        T_ref: { value: '196',   unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '15.6',  unit: 'GPa' },
+        K0p:   { value: '6.2',   unit: '1' },
+      },
       notes: 'Table IV, BM3 fit at 196 K. V₀ = 164.05 Å³ imposed.',
     },
     {
@@ -213,7 +256,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'Vinet',
       molecule: 'D2O',
       isothermal: true,
-      params: { V0: 12.350, V0_reported: 164.05, V0_unit: 'cell', T_ref: 196, P_ref: 0, K0: 15.4, K0p: 6.4, alpha: 0 },
+      params: {
+        V0:    { value: '164.05', unit: 'A3/cell' },
+        T_ref: { value: '196',   unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '15.4',  unit: 'GPa' },
+        K0p:   { value: '6.4',   unit: '1' },
+      },
       notes: 'Table IV, Rydberg-Vinet fit at 196 K. V₀ = 164.05 Å³ imposed.',
     },
     {
@@ -224,7 +273,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'AP1',
       molecule: 'D2O',
       isothermal: true,
-      params: { V0: 12.350, V0_reported: 164.05, V0_unit: 'cell', T_ref: 196, P_ref: 0, K0: 15.6, K0p: 6.2, alpha: 0 },
+      params: {
+        V0:    { value: '164.05', unit: 'A3/cell' },
+        T_ref: { value: '196',   unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '15.6',  unit: 'GPa' },
+        K0p:   { value: '6.2',   unit: '1' },
+      },
       notes: 'Table IV, Holzapfel AP1 fit at 196 K. V₀ = 164.05 Å³ imposed.',
     },
   ],
@@ -236,7 +291,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1063/1.2183324',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 19.65, T_ref: 273.15, P_ref: 0, K0: 8.9, K0p: 6.2, alpha: 5.2e-5 },
+      params: {
+        V0:    { value: '19.65', unit: 'cm3/mol' },
+        T_ref: { value: '273.15', unit: 'K' },
+        P_ref: { value: '0',     unit: 'GPa' },
+        K0:    { value: '8.9',   unit: 'GPa' },
+        K0p:   { value: '6.2',   unit: '1' },
+        alpha: { value: '5.2',   unit: '10-5/K' },
+      },
       notes: 'Simplified BM3 fit. The original IAPWS-2006 formulation uses a full Gibbs energy approach.',
     },
     {
@@ -246,7 +308,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1107/S0108768194004165',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 19.61, T_ref: 250, P_ref: 0, K0: 8.9, K0p: 6.2, alpha: 5.0e-5 },
+      params: {
+        V0:    { value: '19.61', unit: 'cm3/mol' },
+        T_ref: { value: '250',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '8.9',  unit: 'GPa' },
+        K0p:   { value: '6.2',  unit: '1' },
+        alpha: { value: '5.0',  unit: '10-5/K' },
+      },
       notes: 'Primarily a structural study. Elastic parameters adopted from Gammon et al. (1983).',
     },
     {
@@ -256,7 +325,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1107/S0108768194004165',
       eosType: 'BM3',
       molecule: 'D2O',
-      params: { V0: 19.37, T_ref: 250, P_ref: 0, K0: 8.9, K0p: 6.2, alpha: 4.9e-5 },
+      params: {
+        V0:    { value: '19.37', unit: 'cm3/mol' },
+        T_ref: { value: '250',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '8.9',  unit: 'GPa' },
+        K0p:   { value: '6.2',  unit: '1' },
+        alpha: { value: '4.9',  unit: '10-5/K' },
+      },
       notes: 'V₀ derived from D₂O lattice parameters (a = 4.504 Å, c = 7.328 Å at 250 K). Elastic parameters estimated.',
     },
     {
@@ -293,14 +369,20 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       seafreezePhase: 'II',
       notes: 'Gibbs energy (LBF) representation. Valid: ~0.20–0.45 GPa, 180–270 K.',
     },
-
     {
       id: 'ii_d2o_fortes2006',
       citation: 'Fortes et al. (2006)',
       fullRef: 'Fortes, A.D. et al. (2006). The incompressibility and thermal expansivity of D₂O ice II determined by powder neutron diffraction. J. Appl. Cryst., 39, 547–558.',
       eosType: 'BM3',
       molecule: 'D2O',
-      params: { V0: 17.15, T_ref: 250, P_ref: 0, K0: 12.5, K0p: 5.0, alpha: 3.5e-5 },
+      params: {
+        V0:    { value: '17.15', unit: 'cm3/mol' },
+        T_ref: { value: '250',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '12.5', unit: 'GPa' },
+        K0p:   { value: '5.0',  unit: '1' },
+        alpha: { value: '3.5',  unit: '10-5/K' },
+      },
     },
   ],
   III: [
@@ -314,7 +396,6 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       seafreezePhase: 'III',
       notes: 'Gibbs energy (LBF) representation. Valid: ~0.29–0.45 GPa, 240–270 K.',
     },
-
   ],
   V: [
     {
@@ -327,14 +408,20 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       seafreezePhase: 'V',
       notes: 'Gibbs energy (LBF) representation. Valid: ~0.40–0.62 GPa, 210–280 K.',
     },
-
     {
       id: 'v_h2o_fortes2014',
       citation: 'Fortes et al. (2014)',
       fullRef: 'Fortes, A.D. et al. (2014). Equation of state of ice V. J. Appl. Cryst., 47, 215–222.',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 16.48, T_ref: 260, P_ref: 0, K0: 10.5, K0p: 5.2, alpha: 3.1e-5 },
+      params: {
+        V0:    { value: '16.48', unit: 'cm3/mol' },
+        T_ref: { value: '260',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '10.5', unit: 'GPa' },
+        K0p:   { value: '5.2',  unit: '1' },
+        alpha: { value: '3.1',  unit: '10-5/K' },
+      },
     },
   ],
   VI: [
@@ -356,7 +443,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'H2O',
       // Table II, PVT fit. BM2 (K₀' = 4 fixed). α₀ = 14.6(14) × 10⁻⁵ K⁻¹.
-      params: { V0: 14.17, T_ref: 300, P_ref: 0, K0: 14.05, K0p: 4, alpha: 1.46e-4 },
+      params: {
+        V0:    { value: '14.17',    unit: 'cm3/mol' },
+        T_ref: { value: '300',      unit: 'K' },
+        P_ref: { value: '0',        unit: 'GPa' },
+        K0:    { value: '14.05',    unit: 'GPa' },
+        K0p:   { value: '4',        unit: '1' },
+        alpha: { value: '14.6(14)', unit: '10-5/K' },
+      },
       notes: 'PVT BM2 fit (K₀′ fixed at 4). Valid ~1–2.6 GPa, 300–340 K. Table II.',
     },
     {
@@ -365,7 +459,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       fullRef: 'Fortes, A.D. et al. (2012). Crystal structure and thermal expansion of ice VI. J. Appl. Cryst., 45, 681–692.',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 13.60, T_ref: 295, P_ref: 0, K0: 13.7, K0p: 5.4, alpha: 3.0e-5 },
+      params: {
+        V0:    { value: '13.60', unit: 'cm3/mol' },
+        T_ref: { value: '295',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '13.7', unit: 'GPa' },
+        K0p:   { value: '5.4',  unit: '1' },
+        alpha: { value: '3.0',  unit: '10-5/K' },
+      },
     },
     {
       id: 'vi_d2o_fortes2012',
@@ -395,7 +496,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'H2O',
       // Table II, PVT fit. BM2 (K₀' = 4 fixed). α₀ = 11.58(54) × 10⁻⁵ K⁻¹.
-      params: { V0: 12.49, T_ref: 300, P_ref: 0, K0: 20.15, K0p: 4, alpha: 1.158e-4 },
+      params: {
+        V0:    { value: '12.49',      unit: 'cm3/mol' },
+        T_ref: { value: '300',        unit: 'K' },
+        P_ref: { value: '0',          unit: 'GPa' },
+        K0:    { value: '20.15',      unit: 'GPa' },
+        K0p:   { value: '4',          unit: '1' },
+        alpha: { value: '11.58(54)',  unit: '10-5/K' },
+      },
       notes: 'PVT BM2 fit (K₀′ fixed at 4). Valid ~2.7–10.1 GPa, 300–450 K. Table II.',
     },
     {
@@ -405,7 +513,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1029/93JB00701',
       eosType: 'BM3',
       molecule: 'H2O',
-      params: { V0: 12.38, T_ref: 300, P_ref: 0, K0: 23.9, K0p: 4.2, alpha: 2.5e-5 },
+      params: {
+        V0:    { value: '12.38', unit: 'cm3/mol' },
+        T_ref: { value: '300',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '23.9', unit: 'GPa' },
+        K0p:   { value: '4.2',  unit: '1' },
+        alpha: { value: '2.5',  unit: '10-5/K' },
+      },
     },
     {
       id: 'vii_h2o_hemley1987',
@@ -416,7 +531,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=23.7(9), K'=4.15(7), V₀=12.3(3) cm³/mol. RT only.
-      params: { V0: 12.3, T_ref: 300, P_ref: 0, K0: 23.7, K0p: 4.15, alpha: 0 },
+      params: {
+        V0:    { value: '12.3(3)',  unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '23.7(9)', unit: 'GPa' },
+        K0p:   { value: '4.15(7)', unit: '1' },
+      },
       notes: 'BM3 fit, 4.3–128 GPa, RT. V₀ extrapolated to zero pressure.',
     },
     {
@@ -428,7 +549,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 3 "This study". BM3 fit; V₀ constrained by compression data (nonquenchable phase).
-      params: { V0: 12.4, T_ref: 300, P_ref: 0, K0: 21.1, K0p: 4.4, alpha: 0 },
+      params: {
+        V0:    { value: '12.4', unit: 'cm3/mol' },
+        T_ref: { value: '300', unit: 'K' },
+        P_ref: { value: '0',   unit: 'GPa' },
+        K0:    { value: '21.1', unit: 'GPa' },
+        K0p:   { value: '4.4', unit: '1' },
+      },
       notes: 'Table 3, BM3 fit at 300 K. Valid 6.82–60.52 GPa. V₀ is a fitted parameter (ice VII is nonquenchable).',
     },
     {
@@ -440,7 +567,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table II, Experiment row. V₀ = 14.52 cm³/mol fixed from ambient conditions (Ref. 3 therein).
-      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 5.02, K0p: 7.51, alpha: 0 },
+      params: {
+        V0:    { value: '14.52', unit: 'cm3/mol' },
+        T_ref: { value: '300',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '5.02', unit: 'GPa' },
+        K0p:   { value: '7.51', unit: '1' },
+      },
       notes: 'Table II, Experiment. Vinet EoS fit to synchrotron XRD data up to ~40 GPa at 300 K. V₀ fixed at ambient value.',
     },
     {
@@ -450,10 +583,17 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1103/PhysRevB.82.134103',
       eosType: 'VinetAG',
       molecule: 'H2O',
-      // Table II "This study": V₀=14.52 cm³/mol (from Loubeyre et al.), K₀=5.02 GPa, K'=7.51 (same as Sugimura 2008)
-      // α₀=150×10⁻⁵ K⁻¹, δ_T=5.1 (Anderson-Grüneisen thermal expansion)
-      // P(V,T) = P_Vinet(V,T₀) + α₀·(V/V₀)^δ_T · K_T_Vinet(V) · (T−T₀)
-      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 5.02, K0p: 7.51, alpha: 1.50e-3, deltaT: 5.1 },
+      // Table II "This study": V₀=14.52 cm³/mol (from Loubeyre et al.), K₀=5.02 GPa, K'=7.51
+      // α₀=150×10⁻⁵ K⁻¹, δ_T=5.1 (Anderson-Grüneisen)
+      params: {
+        V0:     { value: '14.52', unit: 'cm3/mol' },
+        T_ref:  { value: '300',  unit: 'K' },
+        P_ref:  { value: '0',    unit: 'GPa' },
+        K0:     { value: '5.02', unit: 'GPa' },
+        K0p:    { value: '7.51', unit: '1' },
+        alpha:  { value: '150',  unit: '10-5/K' },
+        deltaT: { value: '5.1',  unit: '1' },
+      },
       notes: 'Table II, This study. Vinet + Anderson-Grüneisen P-V-T EoS. Valid ~19–50 GPa, 430–880 K.',
     },
     // --- Lai et al. (2022) ---
@@ -467,9 +607,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       // Table 1 "This study", BM EoS thermal. V₀=12.3 cm³/mol fixed at 300 K.
       // K₀(T)=21.0+(-0.009)(T-300) GPa; α(T)=15×10⁻⁵+15×10⁻⁸(T-300) K⁻¹ [Berman 1988]
       params: {
-        V0: 12.3, T_ref: 300, P_ref: 0,
-        K0: 21.0, K0p: 4.45,
-        alpha: 15e-5, alpha1: 15e-8, dKdT: -0.009,
+        V0:     { value: '12.3',   unit: 'cm3/mol' },
+        T_ref:  { value: '300',   unit: 'K' },
+        P_ref:  { value: '0',     unit: 'GPa' },
+        K0:     { value: '21.0',  unit: 'GPa' },
+        K0p:    { value: '4.45',  unit: '1' },
+        alpha:  { value: '15',    unit: '10-5/K' },
+        alpha1: { value: '15',    unit: '10-8/K2' },
+        dKdT:   { value: '-0.009', unit: 'GPa/K' },
       },
       notes: 'Table 1, Berman (1988) thermal BM3. Valid 3.5–78.2 GPa, 300–1000 K. SCXRD.',
     },
@@ -482,7 +627,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 "This study", BM EoS 300 K fit (V₀ fitted).
-      params: { V0: 12.4, T_ref: 300, P_ref: 0, K0: 19.2, K0p: 4.6, alpha: 0 },
+      params: {
+        V0:    { value: '12.4', unit: 'cm3/mol' },
+        T_ref: { value: '300', unit: 'K' },
+        P_ref: { value: '0',   unit: 'GPa' },
+        K0:    { value: '19.2', unit: 'GPa' },
+        K0p:   { value: '4.6', unit: '1' },
+      },
       notes: 'Table 1, isothermal BM3 at 300 K. Valid 3.5–78.2 GPa. SCXRD.',
     },
     {
@@ -494,7 +645,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 "This study", Vinet EoS 300 K fit (V₀ fitted, preferred by authors).
-      params: { V0: 12.7, T_ref: 300, P_ref: 0, K0: 15.0, K0p: 5.6, alpha: 0 },
+      params: {
+        V0:    { value: '12.7', unit: 'cm3/mol' },
+        T_ref: { value: '300', unit: 'K' },
+        P_ref: { value: '0',   unit: 'GPa' },
+        K0:    { value: '15.0', unit: 'GPa' },
+        K0p:   { value: '5.6', unit: '1' },
+      },
       notes: 'Table 1, isothermal Vinet at 300 K (fitted V₀). Valid 3.5–78.2 GPa. SCXRD.',
     },
     // --- Wolanin et al. (1997) ---
@@ -507,7 +664,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=14.9(8) fixed, K'=5.4(1), V₀=12.37(8). RT.
-      params: { V0: 12.37, T_ref: 300, P_ref: 0, K0: 14.9, K0p: 5.4, alpha: 0 },
+      params: {
+        V0:    { value: '12.37(8)', unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '14.9(8)', unit: 'GPa' },
+        K0p:   { value: '5.4(1)',  unit: '1' },
+      },
       notes: 'BM3 fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
     },
     {
@@ -519,7 +682,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=14.9(8) fixed, K'=6.2(1), V₀=12.1(3). RT.
-      params: { V0: 12.1, T_ref: 300, P_ref: 0, K0: 14.9, K0p: 6.2, alpha: 0 },
+      params: {
+        V0:    { value: '12.1(3)',  unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '14.9(8)', unit: 'GPa' },
+        K0p:   { value: '6.2(1)',  unit: '1' },
+      },
       notes: 'Vinet fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
     },
     // --- Loubeyre et al. (1999) ---
@@ -532,7 +701,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=4.26, K'=7.75, V₀=14.52. RT, 2–170 GPa.
-      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 4.26, K0p: 7.75, alpha: 0 },
+      params: {
+        V0:    { value: '14.52', unit: 'cm3/mol' },
+        T_ref: { value: '300',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '4.26', unit: 'GPa' },
+        K0p:   { value: '7.75', unit: '1' },
+      },
       notes: 'Vinet fit, 2–170 GPa, RT. V₀ fixed at ambient value. SCXRD.',
     },
     // --- Somayazulu et al. (2008) ---
@@ -545,7 +720,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=4.21(4), K'=7.77(2), V₀=14.52(5). RT, 3–48 GPa.
-      params: { V0: 14.52, T_ref: 300, P_ref: 0, K0: 4.21, K0p: 7.77, alpha: 0 },
+      params: {
+        V0:    { value: '14.52(5)', unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '4.21(4)', unit: 'GPa' },
+        K0p:   { value: '7.77(2)', unit: '1' },
+      },
       notes: 'Vinet fit, 3–48 GPa, RT. rXRD + SXRD.',
     },
     // --- Grande et al. (2022) — 3 pressure-range Vinet fits ---
@@ -558,7 +739,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=18.5(40), K'=2.5(16), V₀=12.79(27). RT.
-      params: { V0: 12.79, T_ref: 300, P_ref: 0, K0: 18.5, K0p: 2.5, alpha: 0 },
+      params: {
+        V0:    { value: '12.79(27)', unit: 'cm3/mol' },
+        T_ref: { value: '300',      unit: 'K' },
+        P_ref: { value: '0',        unit: 'GPa' },
+        K0:    { value: '18.5(40)', unit: 'GPa' },
+        K0p:   { value: '2.5(16)',  unit: '1' },
+      },
       notes: 'Vinet fit, 2.7–5.1 GPa, RT. PXRD.',
     },
     {
@@ -570,7 +757,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=20.8(25), K'=4.49(35), V₀=12.37(16). RT.
-      params: { V0: 12.37, T_ref: 300, P_ref: 0, K0: 20.8, K0p: 4.49, alpha: 0 },
+      params: {
+        V0:    { value: '12.37(16)', unit: 'cm3/mol' },
+        T_ref: { value: '300',      unit: 'K' },
+        P_ref: { value: '0',        unit: 'GPa' },
+        K0:    { value: '20.8(25)', unit: 'GPa' },
+        K0p:   { value: '4.49(35)', unit: '1' },
+      },
       notes: 'Vinet fit, 5.1–30.9 GPa, RT. PXRD.',
     },
     {
@@ -582,7 +775,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       molecule: 'H2O',
       isothermal: true,
       // Table 1 in Lai et al. (2022): K₀=50.5(42), K'=4.50(15), V₀=10.18(13). RT.
-      params: { V0: 10.18, T_ref: 300, P_ref: 0, K0: 50.5, K0p: 4.50, alpha: 0 },
+      params: {
+        V0:    { value: '10.18(13)', unit: 'cm3/mol' },
+        T_ref: { value: '300',      unit: 'K' },
+        P_ref: { value: '0',        unit: 'GPa' },
+        K0:    { value: '50.5(42)', unit: 'GPa' },
+        K0p:   { value: '4.50(15)', unit: '1' },
+      },
       notes: 'Vinet fit, 30.9–60 GPa, RT. PXRD.',
     },
     {
@@ -593,8 +792,14 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'BM3',
       molecule: 'D2O',
       isothermal: true,
-      // V0 = 42.25 Å³ (as reported), converted: 42.25 / (2 × 1.66054) = 12.722 cm³/mol
-      params: { V0: 12.722, V0_reported: 42.25, V0_unit: 'cell', T_ref: 298, P_ref: 0, K0: 13.8, K0p: 5.9, alpha: 0 },
+      // V0 = 42.25 Å³ (as reported); Z=2 → 42.25/(2×1.66054) = 12.722 cm³/mol
+      params: {
+        V0:    { value: '42.25', unit: 'A3/cell' },
+        T_ref: { value: '298',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '13.8', unit: 'GPa' },
+        K0p:   { value: '5.9',  unit: '1' },
+      },
       notes: 'Table III, BM3 fit. V₀ = 42.25 Å³ imposed at 298 K.',
     },
     {
@@ -604,7 +809,13 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       eosType: 'Vinet',
       molecule: 'D2O',
       isothermal: true,
-      params: { V0: 12.722, V0_reported: 42.25, V0_unit: 'cell', T_ref: 298, P_ref: 0, K0: 13.6, K0p: 6.2, alpha: 0 },
+      params: {
+        V0:    { value: '42.25', unit: 'A3/cell' },
+        T_ref: { value: '298',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '13.6', unit: 'GPa' },
+        K0p:   { value: '6.2',  unit: '1' },
+      },
       notes: 'Table III, Vinet (Rydberg-Vinet) fit. V₀ = 42.25 Å³ imposed at 298 K.',
     },
   ],

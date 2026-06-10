@@ -36,6 +36,15 @@ export const title = style({
   letterSpacing: '-0.01em',
 });
 
+export const titleLink = style({
+  fontSize: 24,
+  fontWeight: 400,
+  color: '#001d36',
+  letterSpacing: '-0.01em',
+  textDecoration: 'none',
+  ':hover': { color: '#0061a4' },
+});
+
 export const titleRefLink = style({
   fontSize: 16,
   fontWeight: 500,
