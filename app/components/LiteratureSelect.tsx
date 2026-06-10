@@ -26,6 +26,16 @@ export default function LiteratureSelect({ entries, value, onChange }: Props) {
         ))}
       </select>
       <p className={styles.fullRef}>{selected.fullRef}</p>
+      {selected.doi && (
+        <a
+          className={styles.doiLink}
+          href={`https://doi.org/${selected.doi}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          https://doi.org/{selected.doi}
+        </a>
+      )}
     </div>
   );
 }

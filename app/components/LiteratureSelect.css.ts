@@ -35,3 +35,14 @@ export const fullRef = style({
   color: '#73777f',
   lineHeight: 1.55,
 });
+
+export const doiLink = style({
+  display: 'inline-block',
+  marginTop: 2,
+  fontSize: 12,
+  color: '#0061a4',
+  textDecoration: 'none',
+  ':hover': {
+    textDecoration: 'underline',
+  },
+});

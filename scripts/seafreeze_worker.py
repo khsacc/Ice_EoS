@@ -51,24 +51,19 @@ def main() -> None:
             result = {'status': 'error', 'message': str(exc)}
 
     elif mode == 'TVtoP':
-        from scipy.optimize import brentq
+        from seafreeze.rho2P import rho2P
+
         rho_target = float(req['rho_kgm3'])
-        P_lo, P_hi = _P_RANGES.get(phase, (1.0, 2300.0))
-
-        def f(P_MPa: float) -> float:
-            return _get_rho(T_K, P_MPa, phase) - rho_target
-
         try:
-            f_lo = f(P_lo)
-            f_hi = f(P_hi)
-            if f_lo > 0:
+            P_MPa = float(rho2P(rho_target, T_K, phase))
+            if P_MPa != P_MPa:  # NaN
+                P_lo, P_hi = _P_RANGES.get(phase, (1.0, 2300.0))
                 raise ValueError(
-                    f'Volume too large — below minimum pressure ({P_lo / 1000:.2f} GPa) for ice {phase}')
-            if f_hi < 0:
-                raise ValueError(
-                    f'Volume too small — above maximum pressure ({P_hi / 1000:.2f} GPa) for ice {phase}')
-            P_sol = brentq(f, P_lo, P_hi, xtol=0.1, rtol=1e-6, maxiter=200)
-            result = {'P_GPa': P_sol / 1000.0, 'status': 'ok'}
+                    f'No solution: density {rho_target:.2f} kg/m³ is outside the valid range '
+                    f'for ice {phase} at {T_K:.1f} K '
+                    f'({P_lo / 1000:.2f}–{P_hi / 1000:.2f} GPa)'
+                )
+            result = {'P_GPa': P_MPa / 1000.0, 'status': 'ok'}
         except Exception as exc:
             result = {'status': 'error', 'message': str(exc)}
 

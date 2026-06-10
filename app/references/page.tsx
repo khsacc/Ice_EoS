@@ -35,18 +35,11 @@ export default function ReferencesPage() {
               <h2 className={styles.sectionTitle}>{POLYMORPH_LABELS[polymorph]}</h2>
               {Array.from(pubMap.values()).map((group) => {
                 const rep = group[0];
-                return (
-                  <div key={rep.doi ?? rep.fullRef} className={styles.entryCard}>
+                const cardContent = (
+                  <>
                     <p className={styles.entryRef}>{rep.fullRef}</p>
                     {rep.doi && (
-                      <a
-                        href={`https://doi.org/${rep.doi}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.doiLink}
-                      >
-                        DOI: {rep.doi}
-                      </a>
+                      <span className={styles.doiText}>DOI: {rep.doi}</span>
                     )}
                     {group.map((entry) => (
                       <div key={entry.id} className={styles.entryMeta}>
@@ -55,6 +48,21 @@ export default function ReferencesPage() {
                         {entry.notes && <span className={styles.notes}>{entry.notes}</span>}
                       </div>
                     ))}
+                  </>
+                );
+                return rep.doi ? (
+                  <a
+                    key={rep.doi}
+                    href={`https://doi.org/${rep.doi}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.entryCardLink}
+                  >
+                    {cardContent}
+                  </a>
+                ) : (
+                  <div key={rep.fullRef} className={styles.entryCard}>
+                    {cardContent}
                   </div>
                 );
               })}

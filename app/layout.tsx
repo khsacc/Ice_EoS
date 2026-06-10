@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ice EoS Calculator",
+  title: "Water Ice EoS Dictionary",
   description: "Equations of state calculator for ice polymorphs",
 };
 

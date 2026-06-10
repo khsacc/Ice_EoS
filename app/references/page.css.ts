@@ -52,6 +52,23 @@ export const entryCard = style({
   marginBottom: 12,
 });
 
+export const entryCardLink = style({
+  display: 'block',
+  backgroundColor: '#fff',
+  border: '1px solid #dde2ec',
+  borderRadius: 12,
+  padding: '18px 20px',
+  marginBottom: 12,
+  textDecoration: 'none',
+  color: 'inherit',
+  cursor: 'pointer',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+  ':hover': {
+    borderColor: '#0061a4',
+    boxShadow: '0 2px 8px rgba(0,97,164,0.12)',
+  },
+});
+
 export const entryRef = style({
   fontSize: 14,
   color: '#1a1c1e',
@@ -85,6 +102,13 @@ export const doiLink = style({
   textDecoration: 'none',
   marginBottom: 2,
   ':hover': { textDecoration: 'underline' },
+});
+
+export const doiText = style({
+  display: 'block',
+  fontSize: 12,
+  color: '#0061a4',
+  marginBottom: 2,
 });
 
 export const notes = style({

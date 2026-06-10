@@ -16,9 +16,26 @@ export const inner = style({
   flexWrap: 'wrap',
 });
 
+export const left = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+});
+
 export const credit = style({
   fontSize: 12,
   color: '#73777f',
+});
+
+export const contact = style({
+  fontSize: 12,
+  color: '#73777f',
+});
+
+export const contactLink = style({
+  color: '#0061a4',
+  textDecoration: 'none',
+  ':hover': { textDecoration: 'underline' },
 });
 
 export const nav = style({

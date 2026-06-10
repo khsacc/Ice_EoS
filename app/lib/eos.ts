@@ -1,4 +1,4 @@
-import type { EoSParameters, EoSType, FortesPowerExpParams, MurnaghanParams } from './literature';
+import type { EoSParameters, EoSType, FortesPowerExpParams, FrankPVTParams, MurnaghanParams, RottgerPolynomialParams } from './literature';
 
 function effectiveV0(T: number, params: EoSParameters): number {
   return params.V0 * (1 + params.alpha * (T - params.T_ref));
@@ -173,6 +173,17 @@ export function computeVolumeFortes(T: number, fp: FortesPowerExpParams): number
   return fp.V0 * Math.exp(integrateFortesAlpha(T, fp.p, fp.q, fp.r, fp.s));
 }
 
+// Röttger et al. (2012) polynomial unit-cell volume fit — P = 0 GPa only
+// V_cell(T) [Å³] = Σ_{i=0}^{8} A[i]·T^i;  valid 10–265 K
+// Convert to molar: V_molar = V_cell / (Z × 1.66054)  (1.66054 = 1e24/Nₐ)
+export function computeVolumeRottger(T: number, rp: RottgerPolynomialParams): number {
+  if (T <= 0) throw new Error('Temperature must be positive (K).');
+  if (T > 270) throw new Error('Röttger polynomial valid 10–265 K.');
+  let V_cell = 0;
+  for (let i = 0; i <= 8; i++) V_cell += rp.A[i] * Math.pow(T, i);
+  return V_cell / (rp.Z * 1.66054);
+}
+
 // Murnaghan PVT EoS — Fortes et al. (2012) form
 // V(P,T) = V_ref(T) / [P*·(K'/K(T)) + 1]^(1/K')  where P* = P − P_ref
 // V_ref(T) = V_ref + X1·T* + X2·T*²               T* = T − T_ref
@@ -197,4 +208,138 @@ export function computePressureMurnaghan(T: number, V: number, mp: MurnaghanPara
   const Kt = mp.K_ref + mp.dKdT * Tstar;
   if (Kt <= 0) throw new Error('K(T) ≤ 0 at this temperature — outside model range.');
   return mp.P_ref + (Kt / mp.Kp) * (Math.pow(Vt / V, mp.Kp) - 1);
+}
+
+// ─── Feistel & Wagner (2006) IAPWS ice Ih Gibbs energy EoS ──────────────────
+// ρ(T,p) = [∂g/∂p]_T⁻¹;  g_p computed via complex arithmetic per IAPWS-2006
+
+type C = [number, number]; // [real, imag]
+const cadd   = (a: C, b: C): C => [a[0]+b[0], a[1]+b[1]];
+const csub   = (a: C, b: C): C => [a[0]-b[0], a[1]-b[1]];
+const cmul   = (a: C, b: C): C => [a[0]*b[0]-a[1]*b[1], a[0]*b[1]+a[1]*b[0]];
+const cscale = (a: C, s: number): C => [a[0]*s, a[1]*s];
+const cln    = (a: C): C => [0.5*Math.log(a[0]*a[0]+a[1]*a[1]), Math.atan2(a[1], a[0])];
+const cdiv   = (a: C, b: C): C => {
+  const d = b[0]*b[0]+b[1]*b[1];
+  return [(a[0]*b[0]+a[1]*b[1])/d, (a[1]*b[0]-a[0]*b[1])/d];
+};
+
+const FW_Tt  = 273.16;   // K, triple-point temperature
+const FW_pt  = 611.657;  // Pa, triple-point pressure
+// g0k coefficients (k=0..4), J/kg
+const FW_g0k = [
+  -632020.233449497,
+   0.655022213658955,
+  -1.89369929326131e-8,
+   3.39746123271053e-15,
+  -5.56464869058991e-22,
+];
+// t2 and r2k (k=0..2) are complex, units J/(kg·K) for r2k
+const FW_t2: C   = [0.337315741065416,  0.335449415919309];
+const FW_r2k: C[] = [
+  [-72.597457432922,       -78.100842711287     ],
+  [ -5.57107698030123e-5,    4.64578634580806e-5],
+  [  2.34801409215913e-11,  -2.85651142904720e-11],
+];
+
+// f(τ, t) = (t−τ)ln(t−τ) + (t+τ)ln(t+τ) − 2t·ln(t) − τ²/t  [complex]
+function fwF(tau: number, t: C): C {
+  const tm = csub(t, [tau, 0]);
+  const tp = cadd(t, [tau, 0]);
+  return csub(
+    cadd(cmul(tm, cln(tm)), cmul(tp, cln(tp))),
+    cadd(cscale(cmul(t, cln(t)), 2), cdiv([tau * tau, 0], t)),
+  );
+}
+
+// Specific volume v(T, p) = g_p in m³/kg
+function fwSpecificVolume(T: number, p: number): number {
+  const tau = T / FW_Tt;
+  const x   = p / FW_pt - 101325 / FW_pt; // (π − π₀)
+  let g0p = 0;
+  for (let k = 1; k <= 4; k++) g0p += FW_g0k[k] * k * Math.pow(x, k - 1) / FW_pt;
+  let r2p: C = [0, 0];
+  for (let k = 1; k <= 2; k++) r2p = cadd(r2p, cscale(FW_r2k[k], k * Math.pow(x, k - 1) / FW_pt));
+  return g0p + FW_Tt * cmul(r2p, fwF(tau, FW_t2))[0];
+}
+
+// T (K), P (GPa) → V (cm³/mol);  M = molar mass in g/mol
+export function computeVolumeFeistelWagner(T: number, P_GPa: number, M: number): number {
+  if (T <= 0)    throw new Error('Temperature must be positive (K).');
+  if (T > FW_Tt) throw new Error(`Feistel & Wagner (2006) valid for T ≤ ${FW_Tt} K (ice Ih).`);
+  const v = fwSpecificVolume(T, P_GPa * 1e9);
+  if (v <= 0) throw new Error('Non-physical specific volume — check T and P ranges.');
+  return v * M * 1000; // m³/kg → cm³/mol
+}
+
+// ─── Frank et al. (2004) BM3+thermal PVT EoS for ice VII ─────────────────────
+// V(P,T) = V_BM3(P,T_ref) × exp{[a₀(T−T_ref) + (a₁/2)(T²−T_ref²)] / (1 + (K0p/K0)·P)^eta}
+// where V_BM3(P,T_ref) is the isothermal BM3 volume at T_ref (= 300 K by default).
+// α(P,T) = (a₀ + a₁·T) / (1 + (K0p/K0)·P)^eta
+
+export function computeVolumeFrankPVT(T: number, P: number, fp: FrankPVTParams): number {
+  if (T <= 0) throw new Error('Temperature must be positive (K).');
+  const { V0, K0, K0p } = fp;
+  let Vlo = V0 * 0.10;
+  let Vhi = V0 * 5.0;
+  const Plo_val = bm3Pressure(Vlo, V0, K0, K0p);
+  const Phi_val = bm3Pressure(Vhi, V0, K0, K0p);
+  if (P > Plo_val)
+    throw new Error(`P = ${P} GPa exceeds BM3 range (max ≈ ${Plo_val.toFixed(1)} GPa).`);
+  if (P < Phi_val)
+    throw new Error(`P = ${P} GPa is below BM3 range (tensile limit ≈ ${Phi_val.toFixed(2)} GPa).`);
+  for (let i = 0; i < 300; i++) {
+    const Vmid = (Vlo + Vhi) / 2;
+    if (bm3Pressure(Vmid, V0, K0, K0p) > P) Vlo = Vmid; else Vhi = Vmid;
+    if ((Vhi - Vlo) / V0 < 1e-12) break;
+  }
+  const V_ref_T = (Vlo + Vhi) / 2;
+  const dT = T - fp.T_ref;
+  const dT2 = T * T - fp.T_ref * fp.T_ref;
+  const thermIntegral = (fp.a0 * dT + 0.5 * fp.a1 * dT2) / Math.pow(1 + (K0p / K0) * P, fp.eta);
+  return V_ref_T * Math.exp(thermIntegral);
+}
+
+// T (K), V (cm³/mol) → P (GPa) via outer bisection over [fp.P_min, fp.P_max].
+// V is monotonically decreasing in P for physically reasonable conditions.
+export function computePressureFrankPVT(T: number, V_target: number, fp: FrankPVTParams): number {
+  if (T <= 0) throw new Error('Temperature must be positive (K).');
+  if (V_target <= 0) throw new Error('Volume must be positive (cm³/mol).');
+  const { P_min, P_max } = fp;
+  const V_at_Plo = computeVolumeFrankPVT(T, P_min, fp);
+  const V_at_Phi = computeVolumeFrankPVT(T, P_max, fp);
+  if (V_target > V_at_Plo)
+    throw new Error(`V = ${V_target.toFixed(3)} cm³/mol exceeds model range at this T (V at ${P_min} GPa ≈ ${V_at_Plo.toFixed(3)} cm³/mol).`);
+  if (V_target < V_at_Phi)
+    throw new Error(`V = ${V_target.toFixed(3)} cm³/mol is below model range at this T (V at ${P_max} GPa ≈ ${V_at_Phi.toFixed(3)} cm³/mol).`);
+  let lo = P_min, hi = P_max;
+  for (let i = 0; i < 300; i++) {
+    const mid = (lo + hi) / 2;
+    if (computeVolumeFrankPVT(T, mid, fp) > V_target) lo = mid; else hi = mid;
+    if ((hi - lo) / (P_max - P_min) < 1e-12) break;
+  }
+  return (lo + hi) / 2;
+}
+
+// T (K), V (cm³/mol) → P (GPa) via bisection;  M = molar mass in g/mol
+export function computePressureFeistelWagner(T: number, V_molar: number, M: number): number {
+  if (T <= 0)    throw new Error('Temperature must be positive (K).');
+  if (T > FW_Tt) throw new Error(`Feistel & Wagner (2006) valid for T ≤ ${FW_Tt} K (ice Ih).`);
+  if (V_molar <= 0) throw new Error('Volume must be positive (cm³/mol).');
+  const v_target = V_molar / (M * 1000); // cm³/mol → m³/kg
+  const P_lo = -2e7;  // Pa (−0.02 GPa)
+  const P_hi =  3e8;  // Pa (0.30 GPa)
+  const v_at_lo = fwSpecificVolume(T, P_lo);
+  const v_at_hi = fwSpecificVolume(T, P_hi);
+  if (v_target > v_at_lo)
+    throw new Error(`V = ${V_molar.toFixed(3)} cm³/mol is outside model range (P < −20 MPa).`);
+  if (v_target < v_at_hi)
+    throw new Error(`V = ${V_molar.toFixed(3)} cm³/mol is outside model range (P > 300 MPa).`);
+  let Plo = P_lo, Phi = P_hi;
+  for (let i = 0; i < 300; i++) {
+    const Pm = (Plo + Phi) / 2;
+    if (fwSpecificVolume(T, Pm) > v_target) Plo = Pm; else Phi = Pm;
+    if ((Phi - Plo) / (P_hi - P_lo) < 1e-12) break;
+  }
+  return (Plo + Phi) / 2 / 1e9; // Pa → GPa
 }

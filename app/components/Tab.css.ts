@@ -101,6 +101,16 @@ export const resultTitle = style({
   letterSpacing: '0.1em',
 });
 
+export const resultSubTitle = style({
+  fontSize: 10,
+  fontWeight: 600,
+  color: '#43474e',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  marginTop: 10,
+  marginBottom: 4,
+});
+
 export const resultRow = style({
   display: 'flex',
   justifyContent: 'space-between',
@@ -157,6 +167,12 @@ export const loadingText = style({
   fontSize: 13,
   color: '#0061a4',
   fontStyle: 'italic',
+  padding: '10px 0',
+});
+
+export const promptText = style({
+  fontSize: 13,
+  color: '#0061a4',
   padding: '10px 0',
 });
 

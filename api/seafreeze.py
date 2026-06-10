@@ -57,25 +57,18 @@ def _compute(req: dict) -> dict:
         return {'rho_kgm3': rho, 'status': 'ok'}
 
     if mode == 'TVtoP':
-        from scipy.optimize import brentq
+        from seafreeze.rho2P import rho2P
 
-        rho_target   = float(req['rho_kgm3'])
-        P_lo, P_hi   = _P_RANGES.get(phase, (1.0, 2300.0))
-
-        def f(P_MPa: float) -> float:
-            return _get_rho(T_K, P_MPa, phase) - rho_target
-
-        f_lo, f_hi = f(P_lo), f(P_hi)
-        if f_lo > 0:
+        rho_target = float(req['rho_kgm3'])
+        P_MPa = float(rho2P(rho_target, T_K, phase))
+        if P_MPa != P_MPa:  # NaN
+            P_lo, P_hi = _P_RANGES.get(phase, (1.0, 2300.0))
             raise ValueError(
-                f'Volume too large — P would be below {P_lo / 1000:.2f} GPa for ice {phase}'
+                f'No solution: density {rho_target:.2f} kg/m³ is outside the valid range '
+                f'for ice {phase} at {T_K:.1f} K '
+                f'({P_lo / 1000:.2f}–{P_hi / 1000:.2f} GPa)'
             )
-        if f_hi < 0:
-            raise ValueError(
-                f'Volume too small — P would be above {P_hi / 1000:.2f} GPa for ice {phase}'
-            )
-        P_sol = brentq(f, P_lo, P_hi, xtol=0.1, rtol=1e-6, maxiter=200)
-        return {'P_GPa': P_sol / 1000.0, 'status': 'ok'}
+        return {'P_GPa': P_MPa / 1000.0, 'status': 'ok'}
 
     return {'status': 'error', 'message': f'Unknown mode: {mode!r}'}
 

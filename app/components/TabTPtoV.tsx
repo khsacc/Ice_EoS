@@ -1,11 +1,11 @@
 'use client';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { LITERATURE, POLYMORPH_LABELS, MOLECULE_LABELS, POLYMORPH_Z, MOLAR_MASS } from '../lib/literature';
-import { computeVolume, computeVolumeFortes, computeVolumeMurnaghan } from '../lib/eos';
+import { computeVolume, computeVolumeFortes, computeVolumeFrankPVT, computeVolumeMurnaghan, computeVolumeFeistelWagner, computeVolumeRottger } from '../lib/eos';
 import type { IcePolymorph, Molecule } from '../lib/literature';
 import {
-  type TempUnit, type VolumeUnit,
-  TEMP_UNIT_LABELS, VOLUME_UNIT_LABELS, VOLUME_UNITS, VOLUME_UNIT_DECIMALS,
+  type TempUnit,
+  TEMP_UNIT_LABELS, VOLUME_UNIT_DECIMALS,
   toKelvin, fromMolar,
 } from '../lib/units';
 import {
@@ -37,13 +37,15 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
   const isIsothermal = selected?.isothermal === true;
   const isSeaFreeze = selected?.eosType === 'SeaFreeze';
   const isFortesPowerExp = selected?.eosType === 'FortesPowerExp';
+  const isRottgerPolynomial = selected?.eosType === 'RottgerPolynomial';
   const isMurnaghan = selected?.eosType === 'Murnaghan';
   const isVinetAG = selected?.eosType === 'VinetAG';
   const isBM3Thermal = selected?.eosType === 'BM3Thermal';
+  const isFeistelWagner = selected?.eosType === 'FeistelWagner';
+  const isFrankPVT = selected?.eosType === 'BM3FrankPVT';
 
   const Z = POLYMORPH_Z[polymorph];
   const M = MOLAR_MASS[molecule];
-  const outputUnits: VolumeUnit[] = VOLUME_UNITS;
 
   // Resolve reported string params → numeric EoSParameters for computation + display
   const resolvedParams = useMemo(
@@ -79,6 +81,24 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
       return;
     }
 
+    // RottgerPolynomial: P is fixed at 0, only T is needed
+    if (isRottgerPolynomial) {
+      if (T.trim() === '') { setResult(null); setError(null); setLoading(false); return; }
+      const Tval = parseFloat(T);
+      if (isNaN(Tval)) { setResult(null); setError(null); setLoading(false); return; }
+      const T_K = toKelvin(Tval, tempUnit);
+      try {
+        const V = computeVolumeRottger(T_K, selected.rottgerParams!);
+        setResult({ V });
+        setError(null);
+      } catch (e) {
+        setResult(null);
+        setError((e as Error).message);
+      }
+      setLoading(false);
+      return;
+    }
+
     // Standard path: P is required
     if (P.trim() === '') {
       setResult(null); setError(null); setLoading(false);
@@ -101,6 +121,32 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
     if (isMurnaghan) {
       try {
         const V = computeVolumeMurnaghan(T_K, Pval, selected.murnaghanParams!);
+        setResult({ V });
+        setError(null);
+      } catch (e) {
+        setResult(null);
+        setError((e as Error).message);
+      }
+      setLoading(false);
+      return;
+    }
+
+    if (isFrankPVT) {
+      try {
+        const V = computeVolumeFrankPVT(T_K, Pval, selected.frankPVTParams!);
+        setResult({ V });
+        setError(null);
+      } catch (e) {
+        setResult(null);
+        setError((e as Error).message);
+      }
+      setLoading(false);
+      return;
+    }
+
+    if (isFeistelWagner) {
+      try {
+        const V = computeVolumeFeistelWagner(T_K, Pval, M);
         setResult({ V });
         setError(null);
       } catch (e) {
@@ -152,7 +198,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
       }
       setLoading(false);
     }
-  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, isFortesPowerExp, isMurnaghan, isVinetAG, isBM3Thermal, M, resolvedParams]);
+  }, [T, P, tempUnit, refId, selected, isIsothermal, isSeaFreeze, isFortesPowerExp, isRottgerPolynomial, isMurnaghan, isFrankPVT, isFeistelWagner, isVinetAG, isBM3Thermal, M, resolvedParams]);
 
   if (entries.length === 0) {
     return (
@@ -183,7 +229,12 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
       <LiteratureSelect entries={entries} value={refId} onChange={onRefChange} />
 
       <div className={s.paramsBox}>
-        {isSeaFreeze ? (
+        {isFeistelWagner ? (
+          <>
+            <strong>Gibbs energy (IAPWS-2006) · Feistel &amp; Wagner (2006)</strong>
+            {selected.notes && <span> · {selected.notes}</span>}
+          </>
+        ) : isSeaFreeze ? (
           <>
             <strong>Gibbs energy (LBF) · SeaFreeze</strong>
             {selected.notes && <span> · {selected.notes}</span>}
@@ -196,6 +247,17 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
             q = {selected.fortesParams.q} K ·
             r = {selected.fortesParams.r.toExponential(2)} K⁻¹ ·
             s = {selected.fortesParams.s} K
+          </>
+        ) : isRottgerPolynomial && selected.rottgerParams ? (
+          <>
+            <strong>EoS parameters (Röttger polynomial · P = 0 GPa):</strong>{' '}
+            A₀ = {selected.rottgerParams.A[0]} Å³ ·
+            A₃ = {selected.rottgerParams.A[3].toExponential(4)} Å³/K³ ·
+            A₄ = {selected.rottgerParams.A[4].toExponential(4)} Å³/K⁴ ·
+            A₅ = {selected.rottgerParams.A[5].toExponential(4)} Å³/K⁵ ·
+            A₆ = {selected.rottgerParams.A[6].toExponential(4)} Å³/K⁶ ·
+            A₇ = {selected.rottgerParams.A[7].toExponential(4)} Å³/K⁷
+            {selected.rottgerParams.A[8] !== 0 && ` · A₈ = ${selected.rottgerParams.A[8].toExponential(4)} Å³/K⁸`}
           </>
         ) : isMurnaghan && selected.murnaghanParams ? (
           <>
@@ -226,6 +288,17 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
             α₁ = {selected.params.alpha1!.value} {ALPHA1_UNIT_LABELS[selected.params.alpha1!.unit]} ·
             dK/dT = {selected.params.dKdT!.value} {DKDT_UNIT_LABELS[selected.params.dKdT!.unit]}
           </>
+        ) : isFrankPVT && selected.frankPVTParams ? (
+          <>
+            <strong>EoS parameters (BM3 Frank PVT):</strong>{' '}
+            V₀ = {selected.frankPVTParams.V0} cm³/mol ·
+            T_ref = {selected.frankPVTParams.T_ref} K ·
+            K₀ = {selected.frankPVTParams.K0} GPa ·
+            K₀′ = {selected.frankPVTParams.K0p} ·
+            a₀ = {selected.frankPVTParams.a0.toExponential(2)} K⁻¹ ·
+            a₁ = {selected.frankPVTParams.a1.toExponential(2)} K⁻² ·
+            η = {selected.frankPVTParams.eta}
+          </>
         ) : selected.params ? (
           <>
             <strong>EoS parameters ({selected.eosType}):</strong>{' '}
@@ -239,7 +312,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
         ) : null}
       </div>
 
-      {(isFortesPowerExp || isMurnaghan || isVinetAG || (!isSeaFreeze && selected.notes)) && selected.notes && (
+      {(isFortesPowerExp || isRottgerPolynomial || isMurnaghan || isVinetAG || isFrankPVT || (!isSeaFreeze && !isFeistelWagner && selected.notes)) && selected.notes && (
         <p className={s.noteText}>{selected.notes}</p>
       )}
 
@@ -272,8 +345,8 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
               isIsothermal
                 ? undefined
                 : tempUnit === 'K'
-                ? (isFortesPowerExp ? '200' : isMurnaghan ? String(selected.murnaghanParams!.T_ref) : (resolvedParams ? String(resolvedParams.T_ref) : '250'))
-                : (isFortesPowerExp ? '-73' : isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : (resolvedParams ? String(Math.round(resolvedParams.T_ref - 273.15)) : '-23'))
+                ? ((isFortesPowerExp || isRottgerPolynomial) ? '200' : isMurnaghan ? String(selected.murnaghanParams!.T_ref) : isFrankPVT ? String(selected.frankPVTParams!.T_ref) : (resolvedParams ? String(resolvedParams.T_ref) : '250'))
+                : ((isFortesPowerExp || isRottgerPolynomial) ? '-73' : isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : isFrankPVT ? String(Math.round(selected.frankPVTParams!.T_ref - 273.15)) : (resolvedParams ? String(Math.round(resolvedParams.T_ref - 273.15)) : '-23'))
             }
           />
         </div>
@@ -285,11 +358,11 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
           </div>
           <input
             className={s.input}
-            type={isFortesPowerExp ? 'text' : 'number'}
-            disabled={isFortesPowerExp}
-            value={isFortesPowerExp ? '0 (fixed)' : P}
-            onChange={isFortesPowerExp ? undefined : (e) => setP(e.target.value)}
-            placeholder={isFortesPowerExp ? undefined : isMurnaghan ? String(selected.murnaghanParams!.P_ref) : (resolvedParams ? String(resolvedParams.P_ref) : '0.3')}
+            type={(isFortesPowerExp || isRottgerPolynomial) ? 'text' : 'number'}
+            disabled={isFortesPowerExp || isRottgerPolynomial}
+            value={(isFortesPowerExp || isRottgerPolynomial) ? '0 (fixed)' : P}
+            onChange={(isFortesPowerExp || isRottgerPolynomial) ? undefined : (e) => setP(e.target.value)}
+            placeholder={(isFortesPowerExp || isRottgerPolynomial) ? undefined : isMurnaghan ? String(selected.murnaghanParams!.P_ref) : isFrankPVT ? '10' : (resolvedParams ? String(resolvedParams.P_ref) : '0.3')}
           />
         </div>
       </div>
@@ -297,27 +370,57 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
       {loading && <p className={s.loadingText}>Calculating via SeaFreeze…</p>}
       {error && <div className={s.messageBox.error}>{error}</div>}
 
+      {!loading && !error && !result && (
+        <p className={s.promptText}>
+          {isFortesPowerExp || isRottgerPolynomial
+            ? 'Enter a temperature to calculate.'
+            : isIsothermal
+            ? 'Enter a pressure to calculate.'
+            : 'Enter temperature and pressure to calculate.'}
+        </p>
+      )}
+
       {result && (
         <div className={s.messageBox.result}>
-          <p className={s.resultTitle}>Volume / Density</p>
-          {outputUnits.map((unit, i) => {
-            const val = fromMolar(result.V, unit, Z, M);
-            const isLast = i === outputUnits.length - 1;
-            return (
-              <div key={unit} className={isLast ? s.resultRowLast : s.resultRow}>
-                <span>{VOLUME_UNIT_LABELS[unit]}</span>
-                <span className={s.resultValue}>
-                  {val.toFixed(VOLUME_UNIT_DECIMALS[unit])}
-                </span>
-              </div>
-            );
-          })}
+          <p className={s.resultSubTitle}>Unit-cell volume</p>
+          <div className={s.resultRow}>
+            <span>
+              <span className={s.resultValue}>{fromMolar(result.V, 'cell', Z, M).toFixed(VOLUME_UNIT_DECIMALS['cell'])}</span>
+              {' '}[Å³]
+            </span>
+          </div>
+
+          <p className={s.resultSubTitle}>Molar volume</p>
+          <div className={s.resultRow}>
+            <span>
+              <span className={s.resultValue}>{fromMolar(result.V, 'molar', Z, M).toFixed(VOLUME_UNIT_DECIMALS['molar'])}</span>
+              {' '}[cm³/mol]
+            </span>
+          </div>
+
+          <p className={s.resultSubTitle}>Density</p>
+          <div className={s.resultRow}>
+            <span>
+              <span className={s.resultValue}>{fromMolar(result.V, 'gcm3', Z, M).toFixed(VOLUME_UNIT_DECIMALS['gcm3'])}</span>
+              {' '}[g/cm³]
+            </span>
+          </div>
+          <div className={s.resultRowLast}>
+            <span>
+              <span className={s.resultValue}>{fromMolar(result.V, 'kgm3', Z, M).toFixed(VOLUME_UNIT_DECIMALS['kgm3'])}</span>
+              {' '}[kg/m³]
+            </span>
+          </div>
         </div>
       )}
 
       <p className={s.footerNote}>
-        {isSeaFreeze
+        {isFeistelWagner
+          ? 'Feistel & Wagner (2006) · ρ = [∂g/∂p]_T⁻¹ · IAPWS-2006 Gibbs energy'
+          : isSeaFreeze
           ? 'SeaFreeze · Journaux et al. (2020) Gibbs LBF representation'
+          : isRottgerPolynomial
+          ? 'V_cell(T) = Σ Aᵢ·Tⁱ [Å³] → V_molar = V_cell/(Z·1.66054) · P = 0 GPa fixed'
           : isFortesPowerExp
           ? 'α(T) = p·T^(q/T) + r·exp(s/T) · V(T) = V₀·exp(∫α dT) · P = 0 GPa fixed'
           : isMurnaghan
@@ -326,6 +429,8 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
           ? 'VinetAG · P_th = α₀·(V/V₀)^δ_T · K_T(V) · (T − T_ref)'
           : isBM3Thermal
           ? 'BM3 thermal · V_T0=V₀[1+α₀ΔT+½α₁ΔT²] · K_T0=K₀+(dK/dT)ΔT'
+          : isFrankPVT
+          ? 'BM3 Frank PVT · V=V_BM3(P,300K)·exp(∫₃₀₀ᵀ α dT) · α=(a₀+a₁T)/(1+K′/K·P)^η'
           : `${selected.eosType} EoS${!isIsothermal ? ' · V₀(T) = V₀ · (1 + α(T − T_ref))' : ''}`}
         {' '}· unit cell Z = {Z}
       </p>

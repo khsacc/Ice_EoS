@@ -200,14 +200,16 @@ interface LiteratureEntry {
   murnaghanParams?: MurnaghanParams;   // present for Murnaghan
   seafreezePhase?: string;             // 'II'|'III'|'V'|'VI' for SeaFreeze entries
   isothermal?: boolean;                // true → T input disabled, shows "T K (fixed)"
-  notes?: string;
+  notes?: string;                      // shown in UI; include the key formula(s) used
 }
 ```
+
+**`notes` field convention**: Always include the calculation formula(s) relevant to the entry. For EoS pressure entries, write the EoS equation or the form used (e.g. `"BM3: P = (3K₀/2)(x^7/3 − x^5/3)(1 + 3/4(K₀′−4)(x^2/3−1)), x = V₀(T)/V"`). For thermal-expansion-only entries (FortesPowerExp, RottgerPolynomial), write the α(T) and V(T) forms. Keep it concise — one or two formula strings is enough.
 
 See README.md for the full list of EoS entries currently in the database.
 
 **Not in the database (do not add without source)**: Lobban et al. for ice II/III/V; any Klotz 2009 entries.  
-**Previously hallucinated and deleted**: `vi_d2o_klotz2009`, `vii_d2o_klotz2009`.
+**Previously hallucinated and deleted**: `vi_d2o_klotz2009`, `vii_d2o_klotz2009`, `v_h2o_fortes2014` (Fortes has no published EoS for ice V), `vi_h2o_fortes2012` (Fortes 2012 has D₂O only; no H₂O EoS for ice VI).
 
 ## Unit constants
 
