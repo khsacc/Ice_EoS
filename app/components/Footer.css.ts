@@ -32,6 +32,11 @@ export const contact = style({
   color: '#73777f',
 });
 
+export const license = style({
+  fontSize: 11,
+  color: '#9ea4ae',
+});
+
 export const contactLink = style({
   color: '#0061a4',
   textDecoration: 'none',

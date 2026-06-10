@@ -25,6 +25,18 @@ export default function Footer() {
             </a>
             .
           </span>
+          <span className={styles.license}>
+            Licensed under the{' '}
+            <a
+              href="https://github.com/khsacc/Ice_EoS/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.contactLink}
+            >
+              GNU General Public License v3.0
+            </a>
+            .
+          </span>
         </div>
         <nav className={styles.nav}>
           <Link href="/" className={styles.navLink}>Calculator</Link>
