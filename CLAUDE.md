@@ -243,6 +243,24 @@ CM3_MOL_TO_A3 = 1e24 / 6.02214076e23 ≈ 1.66054
 
 Cell volume conversion: `V_cell [Å³] = V_molar [cm³/mol] × Z × 1.66054`
 
+## SEO
+
+Production URL: **https://ice-eos.vercel.app/**
+
+### Metadata structure
+
+- **`app/layout.tsx`** exports site-wide `Metadata`:
+  - `metadataBase: new URL('https://ice-eos.vercel.app')` — base for resolving relative OG/canonical URLs
+  - `title.template: '%s | Water Ice EoS Dictionary'` — page titles use this template
+  - OG (`openGraph`) and Twitter card (`twitter`) defaults inherited by all pages
+- **`app/page.tsx`** (home) uses `title: { absolute: '...' }` to suppress the template (avoids "X | X" duplication)
+- **`app/references/page.tsx`** uses `title: 'Reference List'` → rendered as "Reference List | Water Ice EoS Dictionary"
+- Each page sets `alternates: { canonical: '/<path>' }` for canonical URLs
+
+### sitemap / robots
+
+`app/sitemap.ts` and `app/robots.ts` use the Next.js App Router file convention to auto-generate `/sitemap.xml` and `/robots.txt` at build time. Add new routes to `sitemap.ts` if new pages are added.
+
 ## Design system
 
 M3-inspired (Material Design 3). Background `#f8f9fc`, primary `#0061a4`.  
