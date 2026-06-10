@@ -1,7 +1,8 @@
-import type { ReportedEoSParameters } from './paramUnits';
+import type { ReportedEoSParameters, ReportedMurnaghanParams } from './paramUnits';
 
 // Re-export so callers (eos.ts, tab components) can keep importing from './literature'
-export type { EoSParameters, ReportedEoSParameters } from './paramUnits';
+export type { EoSParameters, ReportedEoSParameters, MurnaghanParams, ReportedMurnaghanParams } from './paramUnits';
+export { resolveMurnaghanParams } from './paramUnits';
 
 export type IcePolymorph = 'Ih' | 'II' | 'III' | 'V' | 'VI' | 'VII' | 'VIII' | 'X';
 export type Molecule = 'H2O' | 'D2O';
@@ -25,22 +26,6 @@ export interface FortesPowerExpParams {
 export interface RottgerPolynomialParams {
   A: [number, number, number, number, number, number, number, number, number]; // A0..A8 in Å³/K^i
   Z: number; // formula units per unit cell
-}
-
-// Parameters for Murnaghan (1944) thermal PVT EoS — Fortes et al. (2012) form
-// V(P,T) = V_{P_ref,T_ref}(T) / [P*(K'/K(T)) + 1]^(1/K')
-// V_ref(T) = V_ref + X1·T* + X2·T*²    T* = T − T_ref
-// K(T)     = K_ref + dKdT·T*
-// P* = P − P_ref
-export interface MurnaghanParams {
-  V_ref: number;  // cm³/mol at P_ref, T_ref
-  X1: number;     // cm³/mol/K
-  X2: number;     // cm³/mol/K²
-  K_ref: number;  // GPa, bulk modulus at P_ref, T_ref
-  dKdT: number;   // GPa/K, ∂K/∂T at constant P
-  Kp: number;     // dimensionless, K' = ∂K/∂P
-  P_ref: number;  // GPa, reference pressure
-  T_ref: number;  // K, reference temperature
 }
 
 // Parameters for Frank et al. (2004) BM3+thermal PVT EoS for ice VII
@@ -67,7 +52,7 @@ export interface LiteratureEntry {
   molecule: Molecule;
   params?: ReportedEoSParameters;           // undefined for SeaFreeze / FortesPowerExp / Murnaghan / RottgerPolynomial / BM3FrankPVT
   fortesParams?: FortesPowerExpParams;      // defined only for FortesPowerExp entries
-  murnaghanParams?: MurnaghanParams;        // defined only for Murnaghan entries
+  murnaghanParams?: ReportedMurnaghanParams; // defined only for Murnaghan entries
   rottgerParams?: RottgerPolynomialParams;  // defined only for RottgerPolynomial entries
   frankPVTParams?: FrankPVTParams;          // defined only for BM3FrankPVT entries
   seafreezePhase?: string;                  // 'II' | 'III' | 'V' | 'VI' for SeaFreeze entries
@@ -440,14 +425,17 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       doi: '10.1107/S0021889812014847',
       eosType: 'Murnaghan',
       molecule: 'D2O',
-      // Table 4, unit-cell volume column. Z=10, V_cell[Å³] / (10×1.66054) → cm³/mol.
-      // V_1.25,225 = 214.94 Å³ → 12.944 cm³/mol
-      // X1 = 3.47×10⁻² Å³/K → 2.090×10⁻³ cm³/mol/K
-      // X2 = 6.1×10⁻⁵ Å³/K² → 3.673×10⁻⁶ cm³/mol/K²
+      // Table 4, unit-cell volume column. Values stored as reported; resolveMurnaghanParams
+      // converts A3/cell → cm³/mol using Z=10.
       murnaghanParams: {
-        V_ref: 12.944, X1: 2.090e-3, X2: 3.673e-6,
-        K_ref: 21.7, dKdT: -0.015, Kp: 4.4,
-        P_ref: 1.25, T_ref: 225,
+        V_ref: { value: '214.94(5)', unit: 'A3/cell' },
+        X1:    { value: '3.47(6)e-2', unit: 'A3/cell/K' },
+        X2:    { value: '6.1(9)e-5', unit: 'A3/cell/K2' },
+        K_ref: { value: '21.7(2)', unit: 'GPa' },
+        dKdT:  { value: '-0.015(2)', unit: 'GPa/K' },
+        Kp:    { value: '4.4(4)', unit: '1' },
+        P_ref: { value: '1.25', unit: 'GPa' },
+        T_ref: { value: '225', unit: 'K' },
       },
       notes: 'Murnaghan PVT fit. Valid 0 < P < 2.6 GPa, 120 < T < 330 K. Table 4.',
     },

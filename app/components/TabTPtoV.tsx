@@ -9,7 +9,7 @@ import {
   toKelvin, fromMolar,
 } from '../lib/units';
 import {
-  resolveParams,
+  resolveParams, resolveMurnaghanParams,
   PRESSURE_UNIT_LABELS, VOLUME_PARAM_UNIT_LABELS, TEMP_PARAM_UNIT_LABELS,
   ALPHA_UNIT_LABELS, ALPHA1_UNIT_LABELS, DKDT_UNIT_LABELS,
 } from '../lib/paramUnits';
@@ -50,6 +50,10 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
   // Resolve reported string params → numeric EoSParameters for computation + display
   const resolvedParams = useMemo(
     () => selected.params ? resolveParams(selected.params, Z, M) : undefined,
+    [selected, Z, M],
+  );
+  const resolvedMurnaghan = useMemo(
+    () => selected.murnaghanParams ? resolveMurnaghanParams(selected.murnaghanParams, Z, M) : undefined,
     [selected, Z, M],
   );
 
@@ -120,7 +124,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
 
     if (isMurnaghan) {
       try {
-        const V = computeVolumeMurnaghan(T_K, Pval, selected.murnaghanParams!);
+        const V = computeVolumeMurnaghan(T_K, Pval, resolvedMurnaghan!);
         setResult({ V });
         setError(null);
       } catch (e) {
@@ -259,13 +263,13 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
             A₇ = {selected.rottgerParams.A[7].toExponential(4)} Å³/K⁷
             {selected.rottgerParams.A[8] !== 0 && ` · A₈ = ${selected.rottgerParams.A[8].toExponential(4)} Å³/K⁸`}
           </>
-        ) : isMurnaghan && selected.murnaghanParams ? (
+        ) : isMurnaghan && resolvedMurnaghan ? (
           <>
             <strong>EoS parameters (Murnaghan PVT):</strong>{' '}
-            V₁.₂₅,₂₂₅ = {selected.murnaghanParams.V_ref.toFixed(3)} cm³/mol ·
-            K₁.₂₅,₂₂₅ = {selected.murnaghanParams.K_ref} GPa ·
-            ∂K/∂T = {selected.murnaghanParams.dKdT} GPa/K ·
-            K′ = {selected.murnaghanParams.Kp}
+            V₁.₂₅,₂₂₅ = {resolvedMurnaghan.V_ref.toFixed(3)} cm³/mol ·
+            K₁.₂₅,₂₂₅ = {resolvedMurnaghan.K_ref} GPa ·
+            ∂K/∂T = {resolvedMurnaghan.dKdT} GPa/K ·
+            K′ = {resolvedMurnaghan.Kp}
           </>
         ) : isVinetAG && selected.params ? (
           <>
@@ -345,8 +349,8 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
               isIsothermal
                 ? undefined
                 : tempUnit === 'K'
-                ? ((isFortesPowerExp || isRottgerPolynomial) ? '200' : isMurnaghan ? String(selected.murnaghanParams!.T_ref) : isFrankPVT ? String(selected.frankPVTParams!.T_ref) : (resolvedParams ? String(resolvedParams.T_ref) : '250'))
-                : ((isFortesPowerExp || isRottgerPolynomial) ? '-73' : isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : isFrankPVT ? String(Math.round(selected.frankPVTParams!.T_ref - 273.15)) : (resolvedParams ? String(Math.round(resolvedParams.T_ref - 273.15)) : '-23'))
+                ? ((isFortesPowerExp || isRottgerPolynomial) ? '200' : isMurnaghan ? String(resolvedMurnaghan!.T_ref) : isFrankPVT ? String(selected.frankPVTParams!.T_ref) : (resolvedParams ? String(resolvedParams.T_ref) : '250'))
+                : ((isFortesPowerExp || isRottgerPolynomial) ? '-73' : isMurnaghan ? String(Math.round(resolvedMurnaghan!.T_ref - 273.15)) : isFrankPVT ? String(Math.round(selected.frankPVTParams!.T_ref - 273.15)) : (resolvedParams ? String(Math.round(resolvedParams.T_ref - 273.15)) : '-23'))
             }
           />
         </div>
@@ -362,7 +366,7 @@ export default function TabTPtoV({ molecule, polymorph, refId, onRefChange }: Pr
             disabled={isFortesPowerExp || isRottgerPolynomial}
             value={(isFortesPowerExp || isRottgerPolynomial) ? '0 (fixed)' : P}
             onChange={(isFortesPowerExp || isRottgerPolynomial) ? undefined : (e) => setP(e.target.value)}
-            placeholder={(isFortesPowerExp || isRottgerPolynomial) ? undefined : isMurnaghan ? String(selected.murnaghanParams!.P_ref) : isFrankPVT ? '10' : (resolvedParams ? String(resolvedParams.P_ref) : '0.3')}
+            placeholder={(isFortesPowerExp || isRottgerPolynomial) ? undefined : isMurnaghan ? String(resolvedMurnaghan!.P_ref) : isFrankPVT ? '10' : (resolvedParams ? String(resolvedParams.P_ref) : '0.3')}
           />
         </div>
       </div>

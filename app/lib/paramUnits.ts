@@ -91,12 +91,45 @@ export interface ReportedEoSParameters {
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
 // Extract central value, ignoring parenthetical last-digit uncertainty.
-// "42.25(2)" → 42.25    "14.6(14)" → 14.6    "-0.009" → -0.009
+// "42.25(2)" → 42.25    "3.47(6)e-2" → 3.47e-2    "-0.009" → -0.009
 export function parseParamValue(s: string): number {
-  const stripped = s.replace(/\(\d+\)$/, '').trim();
+  const stripped = s.replace(/\(\d+\)/g, '').trim();
   const n = parseFloat(stripped);
   if (isNaN(n)) throw new Error(`Invalid parameter value: "${s}"`);
   return n;
+}
+
+// ─── Murnaghan PVT resolved parameters (computation-ready) ───────────────────
+
+// Fortes et al. (2012) form:
+// V(P,T) = V_ref(T) / [P*(K'/K(T)) + 1]^(1/K')
+// V_ref(T) = V_ref + X1·T* + X2·T*²    (T* = T − T_ref, P* = P − P_ref)
+// K(T)     = K_ref + dKdT·T*
+export interface MurnaghanParams {
+  V_ref: number;  // cm³/mol at P_ref, T_ref
+  X1: number;     // cm³/mol/K
+  X2: number;     // cm³/mol/K²
+  K_ref: number;  // GPa, bulk modulus at P_ref, T_ref
+  dKdT: number;   // GPa/K, ∂K/∂T at constant P
+  Kp: number;     // dimensionless, K' = ∂K/∂P
+  P_ref: number;  // GPa, reference pressure
+  T_ref: number;  // K, reference temperature
+}
+
+// Volume-rate units for Murnaghan X1, X2 thermal coefficients
+export type ParamVolumeRateUnit  = 'cm3/mol/K'  | 'A3/cell/K';
+export type ParamVolumeRate2Unit = 'cm3/mol/K2' | 'A3/cell/K2';
+
+// Stored in LiteratureEntry exactly as printed in the source paper
+export interface ReportedMurnaghanParams {
+  V_ref: ReportedParam<ParamVolumeUnit>;        // volume at P_ref, T_ref
+  X1:    ReportedParam<ParamVolumeRateUnit>;    // dV_ref/dT linear term
+  X2:    ReportedParam<ParamVolumeRate2Unit>;   // dV_ref/dT quadratic term
+  K_ref: ReportedParam<ParamPressureUnit>;      // bulk modulus at P_ref, T_ref
+  dKdT:  ReportedParam<ParamDKDTUnit>;          // ∂K/∂T
+  Kp:    ReportedParam<Dimensionless>;          // K' = ∂K/∂P
+  P_ref: ReportedParam<ParamPressureUnit>;      // reference pressure
+  T_ref: ReportedParam<ParamTempUnit>;          // reference temperature
 }
 
 // ─── Resolution to computation-ready EoSParameters ───────────────────────────
@@ -127,5 +160,23 @@ export function resolveParams(rp: ReportedEoSParameters, Z: number, M: number): 
     alpha1: rp.alpha1 ? parseParamValue(rp.alpha1.value) * ALPHA1_TO_K2[rp.alpha1.unit] : undefined,
     dKdT:   rp.dKdT   ? parseParamValue(rp.dKdT.value)   * DKDT_TO_GPAK[rp.dKdT.unit]  : undefined,
     deltaT: rp.deltaT  ? parseParamValue(rp.deltaT.value)                                 : undefined,
+  };
+}
+
+// Convert ReportedMurnaghanParams → MurnaghanParams for use in eos.ts functions.
+export function resolveMurnaghanParams(rp: ReportedMurnaghanParams, Z: number, M: number): MurnaghanParams {
+  const T_val = parseParamValue(rp.T_ref.value);
+  const factor = Z * CM3_MOL_TO_A3;
+  const resolveVRate  = (v: ReportedParam<ParamVolumeRateUnit>)  => parseParamValue(v.value) / (v.unit === 'A3/cell/K'  ? factor : 1);
+  const resolveVRate2 = (v: ReportedParam<ParamVolumeRate2Unit>) => parseParamValue(v.value) / (v.unit === 'A3/cell/K2' ? factor : 1);
+  return {
+    V_ref: resolveV0(rp.V_ref, Z, M),
+    X1:    resolveVRate(rp.X1),
+    X2:    resolveVRate2(rp.X2),
+    K_ref: parseParamValue(rp.K_ref.value) * PRESSURE_TO_GPA[rp.K_ref.unit],
+    dKdT:  parseParamValue(rp.dKdT.value)  * DKDT_TO_GPAK[rp.dKdT.unit],
+    Kp:    parseParamValue(rp.Kp.value),
+    P_ref: parseParamValue(rp.P_ref.value) * PRESSURE_TO_GPA[rp.P_ref.unit],
+    T_ref: rp.T_ref.unit === 'C' ? T_val + 273.15 : T_val,
   };
 }

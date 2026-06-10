@@ -9,7 +9,7 @@ import {
   toKelvin, toMolar, fromMolar,
 } from '../lib/units';
 import {
-  resolveParams,
+  resolveParams, resolveMurnaghanParams,
   PRESSURE_UNIT_LABELS, VOLUME_PARAM_UNIT_LABELS, TEMP_PARAM_UNIT_LABELS,
   ALPHA_UNIT_LABELS, ALPHA1_UNIT_LABELS, DKDT_UNIT_LABELS,
 } from '../lib/paramUnits';
@@ -52,6 +52,10 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
   // Resolve reported string params → numeric EoSParameters for computation + display
   const resolvedParams = useMemo(
     () => selected.params ? resolveParams(selected.params, Z, M) : undefined,
+    [selected, Z, M],
+  );
+  const resolvedMurnaghan = useMemo(
+    () => selected.murnaghanParams ? resolveMurnaghanParams(selected.murnaghanParams, Z, M) : undefined,
     [selected, Z, M],
   );
 
@@ -114,7 +118,7 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
       return () => { ctrl.abort(); };
     } else if (isMurnaghan) {
       try {
-        const P = computePressureMurnaghan(T_K, V_molar, selected.murnaghanParams!);
+        const P = computePressureMurnaghan(T_K, V_molar, resolvedMurnaghan!);
         setResult({ P, V_molar });
         setError(null);
       } catch (e) {
@@ -180,8 +184,8 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
     : null;
 
   // V placeholder in current unit
-  const v0InUnit = isMurnaghan && selected.murnaghanParams
-    ? fromMolar(selected.murnaghanParams.V_ref, volUnit, Z, M)
+  const v0InUnit = isMurnaghan && resolvedMurnaghan
+    ? fromMolar(resolvedMurnaghan.V_ref, volUnit, Z, M)
     : isFrankPVT && selected.frankPVTParams
     ? fromMolar(selected.frankPVTParams.V0, volUnit, Z, M)
     : resolvedParams
@@ -204,13 +208,13 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
             <strong>Gibbs energy (LBF) · SeaFreeze</strong>
             {selected.notes && <span> · {selected.notes}</span>}
           </>
-        ) : isMurnaghan && selected.murnaghanParams ? (
+        ) : isMurnaghan && resolvedMurnaghan ? (
           <>
             <strong>EoS parameters (Murnaghan PVT):</strong>{' '}
-            V₁.₂₅,₂₂₅ = {selected.murnaghanParams.V_ref.toFixed(3)} cm³/mol ·
-            K₁.₂₅,₂₂₅ = {selected.murnaghanParams.K_ref} GPa ·
-            ∂K/∂T = {selected.murnaghanParams.dKdT} GPa/K ·
-            K′ = {selected.murnaghanParams.Kp}
+            V₁.₂₅,₂₂₅ = {resolvedMurnaghan.V_ref.toFixed(3)} cm³/mol ·
+            K₁.₂₅,₂₂₅ = {resolvedMurnaghan.K_ref} GPa ·
+            ∂K/∂T = {resolvedMurnaghan.dKdT} GPa/K ·
+            K′ = {resolvedMurnaghan.Kp}
           </>
         ) : isVinetAG && selected.params ? (
           <>
@@ -290,8 +294,8 @@ export default function TabTVtoP({ molecule, polymorph, refId, onRefChange }: Pr
               isIsothermal
                 ? undefined
                 : tempUnit === 'K'
-                ? (isMurnaghan ? String(selected.murnaghanParams!.T_ref) : isFrankPVT ? String(selected.frankPVTParams!.T_ref) : (resolvedParams ? String(resolvedParams.T_ref) : '250'))
-                : (isMurnaghan ? String(Math.round(selected.murnaghanParams!.T_ref - 273.15)) : isFrankPVT ? String(Math.round(selected.frankPVTParams!.T_ref - 273.15)) : (resolvedParams ? String(Math.round(resolvedParams.T_ref - 273.15)) : '-23'))
+                ? (isMurnaghan ? String(resolvedMurnaghan!.T_ref) : isFrankPVT ? String(selected.frankPVTParams!.T_ref) : (resolvedParams ? String(resolvedParams.T_ref) : '250'))
+                : (isMurnaghan ? String(Math.round(resolvedMurnaghan!.T_ref - 273.15)) : isFrankPVT ? String(Math.round(selected.frankPVTParams!.T_ref - 273.15)) : (resolvedParams ? String(Math.round(resolvedParams.T_ref - 273.15)) : '-23'))
             }
           />
         </div>
