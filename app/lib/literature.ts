@@ -441,6 +441,7 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
     },
   ],
   VII: [
+    // --- Bezacier et al. (2014) — default ---
     {
       id: 'vii_h2o_bezacier2014',
       citation: 'Bezacier et al. (2014)',
@@ -458,122 +459,6 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
         alpha: { value: '11.58(54)',  unit: '10-5/K' },
       },
       notes: 'PVT BM2 fit (K₀′ fixed at 4). Valid ~2.7–10.1 GPa, 300–450 K. Table II. P = (3K₀/2)[(V₀(T)/V)^(7/3) − (V₀(T)/V)^(5/3)]; V₀(T) = V₀[1 + α₀(T − T_ref)].',
-    },
-    {
-      id: 'vii_h2o_fei1993',
-      citation: 'Fei et al. (1993)',
-      fullRef: 'Fei, Y., Mao, H.-K. & Hemley, R.J. (1993). Thermal expansivity, bulk modulus, and melting curve of H₂O–ice VII to 20 GPa. J. Chem. Phys., 99, 5369–5373.',
-      doi: '10.1063/1.465980',
-      eosType: 'BM3Thermal',
-      molecule: 'H2O',
-      params: {
-        V0:    { value: '12.3(2)',  unit: 'cm3/mol' },
-        T_ref: { value: '300',     unit: 'K' },
-        P_ref: { value: '0',       unit: 'GPa' },
-        K0:    { value: '23.9(7)', unit: 'GPa' },
-        K0p:   { value: '4.2(5)',  unit: '1' },
-        // α₀(T) = a₀ + a₁T; a₀=−3.9×10⁻⁴, a₁=1.5×10⁻⁶. alpha = α₀(300K), alpha1 = a₁
-        alpha:  { value: '6.0', unit: '10-5/K' },
-        alpha1: { value: '1.5', unit: '10-6/K2' },
-      },
-      notes: 'BM3 (isothermal, 300 K): P = (3K₀/2)(x⁷/³−x⁵/³)(1+(3/4)(K₀′−4)(x²/³−1)), x=V₀/V. PVT: V(P,T)=V(P,300K)·exp[∫α(P,T)dT], α(P,T)=α₀(T)(1+K′₀/K₀·P)^(−η), α₀(T)=a₀+a₁T; a₀=−3.9×10⁻⁴, a₁=1.5×10⁻⁶, η=0.9. Pressure-dependent α correction (η) not implemented; zero-pressure α₀(T) is used.',
-    },
-    {
-      id: 'vii_h2o_hemley1987',
-      citation: 'Hemley et al. (1987)',
-      fullRef: 'Hemley, R.J. et al. (1987). Static compression of H₂O-ice to 128 GPa. Nature, 330, 737–740.',
-      doi: '10.1038/330737a0',
-      eosType: 'BM3',
-      molecule: 'H2O',
-      isothermal: true,
-      // Fig. 2 caption in Hemley et al. (1987): V₀₂=12.3(3) cm³/mol, K₀₂=23.7(9) GPa, K₀₂'=4.15(7). RT.
-      // V₀ fitted simultaneously with K₀ using Jeanloz (1981) finite-strain method (BM3 form, p* = ρ₀₁ of ice I).
-      params: {
-        V0:    { value: '12.3(3)',  unit: 'cm3/mol' },
-        T_ref: { value: '300',     unit: 'K' },
-        P_ref: { value: '0',       unit: 'GPa' },
-        K0:    { value: '23.7(9)', unit: 'GPa' },
-        K0p:   { value: '4.15(7)', unit: '1' },
-      },
-      notes: 'BM3 (Jeanloz 1981 finite-strain form): P = (3K₀/2)(x⁷/³−x⁵/³)(1+(3/4)(K₀′−4)(x²/³−1)), x=V₀/V. V₀ extrapolated to zero pressure by linear least-squares fit using ice I density as reference. 4.3–128 GPa, RT.',
-    },
-    {
-      id: 'vii_h2o_frank2004',
-      citation: 'Frank et al. (2004)',
-      fullRef: 'Frank, M.R., Fei, Y. & Hu, J. (2004). Constraining the equation of state of fluid H₂O to 80 GPa using the melting curve, bulk modulus, and thermal expansivity of Ice VII. Geochim. Cosmochim. Acta, 68, 2781–2790.',
-      doi: '10.1016/j.gca.2003.12.007',
-      eosType: 'BM3',
-      molecule: 'H2O',
-      isothermal: true,
-      // Table 3 "This study". BM3 fit; V₀ constrained by compression data (nonquenchable phase).
-      params: {
-        V0:    { value: '12.4', unit: 'cm3/mol' },
-        T_ref: { value: '300', unit: 'K' },
-        P_ref: { value: '0',   unit: 'GPa' },
-        K0:    { value: '21.1', unit: 'GPa' },
-        K0p:   { value: '4.4', unit: '1' },
-      },
-      notes: 'Table 3, BM3 fit at 300 K. Valid 6.57–60.52 GPa. V₀ is a fitted parameter (ice VII is nonquenchable).',
-    },
-    {
-      id: 'vii_h2o_frank2004_pvt',
-      citation: 'Frank et al. (2004) PVT',
-      fullRef: 'Frank, M.R., Fei, Y. & Hu, J. (2004). Constraining the equation of state of fluid H₂O to 80 GPa using the melting curve, bulk modulus, and thermal expansivity of Ice VII. Geochim. Cosmochim. Acta, 68, 2781–2790.',
-      doi: '10.1016/j.gca.2003.12.007',
-      eosType: 'BM3FrankPVT',
-      molecule: 'H2O',
-      // Eqs. 2–5. BM3 isothermal params at 300 K from Table 3 "This study".
-      // α(P,T) = (a₀+a₁T)/(1+(K′/K)P)^η; a₀=-4.2×10⁻⁴ K⁻¹, a₁=1.56×10⁻⁶ K⁻², η=1.1
-      frankPVTParams: {
-        V0: 12.4,    // cm³/mol
-        K0: 21.1,    // GPa
-        K0p: 4.4,
-        T_ref: 300,  // K
-        a0: -4.2e-4, // K⁻¹
-        a1: 1.56e-6, // K⁻²
-        eta: 1.1,
-        P_min: 5.0,  // GPa (data from 6.57 GPa; slight extension for bisection)
-        P_max: 65.0, // GPa (data to 60.52 GPa)
-      },
-      notes: 'Eqs. 4–5. α(P,T) = (a₀+a₁T)·(1+(K′/K)P)⁻η; V(P,T) = V_BM3(P,300K)·exp(∫₃₀₀ᵀ α dT). Valid 6.57–60.52 GPa, T ≥ 300 K (data collected on heating).',
-    },
-    {
-      id: 'vii_h2o_sugimura2008',
-      citation: 'Sugimura et al. (2008) P–V 300 K',
-      fullRef: 'Sugimura, E. et al. (2008). Compression of H₂O ice to 126 GPa and implications for hydrogen-bond symmetrization: Synchrotron x-ray diffraction measurements and density-functional calculations. Phys. Rev. B, 77, 214103.',
-      doi: '10.1103/PhysRevB.77.214103',
-      eosType: 'Vinet',
-      molecule: 'H2O',
-      isothermal: true,
-      // Table II, Experiment row. V₀ = 14.52 cm³/mol fixed from ambient conditions (Ref. 3 therein).
-      params: {
-        V0:    { value: '14.52', unit: 'cm3/mol' },
-        T_ref: { value: '300',  unit: 'K' },
-        P_ref: { value: '0',    unit: 'GPa' },
-        K0:    { value: '5.02', unit: 'GPa' },
-        K0p:   { value: '7.51', unit: '1' },
-      },
-      notes: 'Table II, Experiment. Vinet EoS fit to synchrotron XRD data up to ~40 GPa at 300 K. V₀ fixed at ambient value.',
-    },
-    {
-      id: 'vii_h2o_sugimura2010',
-      citation: 'Sugimura et al. (2010) P–V–T',
-      fullRef: 'Sugimura, E. et al. (2010). Simultaneous high-pressure and high-temperature volume measurements of ice VII and its thermal equation of state. Phys. Rev. B, 82, 134103.',
-      doi: '10.1103/PhysRevB.82.134103',
-      eosType: 'VinetAG',
-      molecule: 'H2O',
-      // Table II "This study": V₀=14.52 cm³/mol (from Loubeyre et al.), K₀=5.02 GPa, K'=7.51
-      // α₀=150×10⁻⁵ K⁻¹, δ_T=5.1 (Anderson-Grüneisen)
-      params: {
-        V0:     { value: '14.52', unit: 'cm3/mol' },
-        T_ref:  { value: '300',  unit: 'K' },
-        P_ref:  { value: '0',    unit: 'GPa' },
-        K0:     { value: '5.02', unit: 'GPa' },
-        K0p:    { value: '7.51', unit: '1' },
-        alpha:  { value: '150',  unit: '10-5/K' },
-        deltaT: { value: '5.1',  unit: '1' },
-      },
-      notes: 'Table II, This study. Vinet + Anderson-Grüneisen P-V-T EoS. Valid ~19–50 GPa, 430–880 K.',
     },
     // --- Lai et al. (2023) ---
     {
@@ -633,81 +518,6 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       },
       notes: 'Table 1, isothermal Vinet at 300 K (fitted V₀). Valid 3.5–78.2 GPa. SCXRD.',
     },
-    // --- Wolanin et al. (1997) ---
-    {
-      id: 'vii_h2o_wolanin1997_bm3',
-      citation: 'Wolanin et al. (1997) BM3',
-      fullRef: 'Wolanin, E. et al. (1997). Equation of state of ice VII up to 106 GPa. Phys. Rev. B, 56, 5781.',
-      doi: '10.1103/PhysRevB.56.5781',
-      eosType: 'BM3',
-      molecule: 'H2O',
-      isothermal: true,
-      // Table 1 in Lai et al. (2022): K₀=14.9(8) fixed, K'=5.4(1), V₀=12.37(8). RT.
-      params: {
-        V0:    { value: '12.37(8)', unit: 'cm3/mol' },
-        T_ref: { value: '300',     unit: 'K' },
-        P_ref: { value: '0',       unit: 'GPa' },
-        K0:    { value: '14.9(8)', unit: 'GPa' },
-        K0p:   { value: '5.4(1)',  unit: '1' },
-      },
-      notes: 'BM3 fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
-    },
-    {
-      id: 'vii_h2o_wolanin1997_vinet',
-      citation: 'Wolanin et al. (1997) Vinet',
-      fullRef: 'Wolanin, E. et al. (1997). Equation of state of ice VII up to 106 GPa. Phys. Rev. B, 56, 5781.',
-      doi: '10.1103/PhysRevB.56.5781',
-      eosType: 'Vinet',
-      molecule: 'H2O',
-      isothermal: true,
-      // Table 1 in Lai et al. (2022): K₀=14.9(8) fixed, K'=6.2(1), V₀=12.1(3). RT.
-      params: {
-        V0:    { value: '12.1(3)',  unit: 'cm3/mol' },
-        T_ref: { value: '300',     unit: 'K' },
-        P_ref: { value: '0',       unit: 'GPa' },
-        K0:    { value: '14.9(8)', unit: 'GPa' },
-        K0p:   { value: '6.2(1)',  unit: '1' },
-      },
-      notes: 'Vinet fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
-    },
-    // --- Loubeyre et al. (1999) ---
-    {
-      id: 'vii_h2o_loubeyre1999',
-      citation: 'Loubeyre et al. (1999)',
-      fullRef: 'Loubeyre, P. et al. (1999). Modulated phases and proton centring in ice observed by X-ray diffraction up to 170 GPa. Nature, 397, 503–506.',
-      doi: '10.1038/17300',
-      eosType: 'Vinet',
-      molecule: 'H2O',
-      isothermal: true,
-      // Fig. 1 caption: V₀=14.52 cm³/mol, K₀=4.26 GPa, K₀′=7.75. RT (300 K), 2–170 GPa.
-      params: {
-        V0:    { value: '14.52', unit: 'cm3/mol' },
-        T_ref: { value: '300',  unit: 'K' },
-        P_ref: { value: '0',    unit: 'GPa' },
-        K0:    { value: '4.26', unit: 'GPa' },
-        K0p:   { value: '7.75', unit: '1' },
-      },
-      notes: 'Vinet fit, 2–170 GPa, RT. V₀ fixed at ambient value. SCXRD.',
-    },
-    // --- Somayazulu et al. (2008) ---
-    {
-      id: 'vii_h2o_somayazulu2008',
-      citation: 'Somayazulu et al. (2008)',
-      fullRef: 'Somayazulu, M. et al. (2008). In situ high-pressure x-ray diffraction study of H₂O ice VII. J. Chem. Phys., 128, 064510.',
-      doi: '10.1063/1.2813890',
-      eosType: 'Vinet',
-      molecule: 'H2O',
-      isothermal: true,
-      // Table 1 in Lai et al. (2022): K₀=4.21(4), K'=7.77(2), V₀=14.52(5). RT, 3–48 GPa.
-      params: {
-        V0:    { value: '14.52(5)', unit: 'cm3/mol' },
-        T_ref: { value: '300',     unit: 'K' },
-        P_ref: { value: '0',       unit: 'GPa' },
-        K0:    { value: '4.21(4)', unit: 'GPa' },
-        K0p:   { value: '7.77(2)', unit: '1' },
-      },
-      notes: 'Vinet fit, 3–48 GPa, RT. rXRD + SXRD.',
-    },
     // --- Grande et al. (2022) — 3 pressure-range Vinet fits ---
     {
       id: 'vii_h2o_grande2022_low',
@@ -763,6 +573,7 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
       },
       notes: 'Vinet fit, 30.9–60 GPa, RT. PXRD.',
     },
+    // --- Klotz et al. (2017) — D₂O ---
     {
       id: 'vii_d2o_klotz2017_bm3',
       citation: 'Klotz et al. (2017) BM3',
@@ -815,6 +626,202 @@ export const LITERATURE: Record<IcePolymorph, LiteratureEntry[]> = {
         K0p:   { value: '6.0(1)',  unit: '1' },
       },
       notes: 'Table III, Holzapfel AP1 fit. V₀ = 42.25 Å³ imposed at 298 K.',
+    },
+    // --- Sugimura et al. (2010) ---
+    {
+      id: 'vii_h2o_sugimura2010',
+      citation: 'Sugimura et al. (2010) P–V–T',
+      fullRef: 'Sugimura, E. et al. (2010). Simultaneous high-pressure and high-temperature volume measurements of ice VII and its thermal equation of state. Phys. Rev. B, 82, 134103.',
+      doi: '10.1103/PhysRevB.82.134103',
+      eosType: 'VinetAG',
+      molecule: 'H2O',
+      // Table II "This study": V₀=14.52 cm³/mol (from Loubeyre et al.), K₀=5.02 GPa, K'=7.51
+      // α₀=150×10⁻⁵ K⁻¹, δ_T=5.1 (Anderson-Grüneisen)
+      params: {
+        V0:     { value: '14.52', unit: 'cm3/mol' },
+        T_ref:  { value: '300',  unit: 'K' },
+        P_ref:  { value: '0',    unit: 'GPa' },
+        K0:     { value: '5.02', unit: 'GPa' },
+        K0p:    { value: '7.51', unit: '1' },
+        alpha:  { value: '150',  unit: '10-5/K' },
+        deltaT: { value: '5.1',  unit: '1' },
+      },
+      notes: 'Table II, This study. Vinet + Anderson-Grüneisen P-V-T EoS. Valid ~19–50 GPa, 430–880 K.',
+    },
+    // --- Somayazulu et al. (2008) ---
+    {
+      id: 'vii_h2o_somayazulu2008',
+      citation: 'Somayazulu et al. (2008)',
+      fullRef: 'Somayazulu, M. et al. (2008). In situ high-pressure x-ray diffraction study of H₂O ice VII. J. Chem. Phys., 128, 064510.',
+      doi: '10.1063/1.2813890',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 1 in Lai et al. (2022): K₀=4.21(4), K'=7.77(2), V₀=14.52(5). RT, 3–48 GPa.
+      params: {
+        V0:    { value: '14.52(5)', unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '4.21(4)', unit: 'GPa' },
+        K0p:   { value: '7.77(2)', unit: '1' },
+      },
+      notes: 'Vinet fit, 3–48 GPa, RT. rXRD + SXRD.',
+    },
+    // --- Sugimura et al. (2008) ---
+    {
+      id: 'vii_h2o_sugimura2008',
+      citation: 'Sugimura et al. (2008) P–V 300 K',
+      fullRef: 'Sugimura, E. et al. (2008). Compression of H₂O ice to 126 GPa and implications for hydrogen-bond symmetrization: Synchrotron x-ray diffraction measurements and density-functional calculations. Phys. Rev. B, 77, 214103.',
+      doi: '10.1103/PhysRevB.77.214103',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table II, Experiment row. V₀ = 14.52 cm³/mol fixed from ambient conditions (Ref. 3 therein).
+      params: {
+        V0:    { value: '14.52', unit: 'cm3/mol' },
+        T_ref: { value: '300',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '5.02', unit: 'GPa' },
+        K0p:   { value: '7.51', unit: '1' },
+      },
+      notes: 'Table II, Experiment. Vinet EoS fit to synchrotron XRD data up to ~40 GPa at 300 K. V₀ fixed at ambient value.',
+    },
+    // --- Frank et al. (2004) ---
+    {
+      id: 'vii_h2o_frank2004',
+      citation: 'Frank et al. (2004)',
+      fullRef: 'Frank, M.R., Fei, Y. & Hu, J. (2004). Constraining the equation of state of fluid H₂O to 80 GPa using the melting curve, bulk modulus, and thermal expansivity of Ice VII. Geochim. Cosmochim. Acta, 68, 2781–2790.',
+      doi: '10.1016/j.gca.2003.12.007',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table 3 "This study". BM3 fit; V₀ constrained by compression data (nonquenchable phase).
+      params: {
+        V0:    { value: '12.4', unit: 'cm3/mol' },
+        T_ref: { value: '300', unit: 'K' },
+        P_ref: { value: '0',   unit: 'GPa' },
+        K0:    { value: '21.1', unit: 'GPa' },
+        K0p:   { value: '4.4', unit: '1' },
+      },
+      notes: 'Table 3, BM3 fit at 300 K. Valid 6.57–60.52 GPa. V₀ is a fitted parameter (ice VII is nonquenchable).',
+    },
+    {
+      id: 'vii_h2o_frank2004_pvt',
+      citation: 'Frank et al. (2004) PVT',
+      fullRef: 'Frank, M.R., Fei, Y. & Hu, J. (2004). Constraining the equation of state of fluid H₂O to 80 GPa using the melting curve, bulk modulus, and thermal expansivity of Ice VII. Geochim. Cosmochim. Acta, 68, 2781–2790.',
+      doi: '10.1016/j.gca.2003.12.007',
+      eosType: 'BM3FrankPVT',
+      molecule: 'H2O',
+      // Eqs. 2–5. BM3 isothermal params at 300 K from Table 3 "This study".
+      // α(P,T) = (a₀+a₁T)/(1+(K′/K)P)^η; a₀=-4.2×10⁻⁴ K⁻¹, a₁=1.56×10⁻⁶ K⁻², η=1.1
+      frankPVTParams: {
+        V0: 12.4,    // cm³/mol
+        K0: 21.1,    // GPa
+        K0p: 4.4,
+        T_ref: 300,  // K
+        a0: -4.2e-4, // K⁻¹
+        a1: 1.56e-6, // K⁻²
+        eta: 1.1,
+        P_min: 5.0,  // GPa (data from 6.57 GPa; slight extension for bisection)
+        P_max: 65.0, // GPa (data to 60.52 GPa)
+      },
+      notes: 'Eqs. 4–5. α(P,T) = (a₀+a₁T)·(1+(K′/K)P)⁻η; V(P,T) = V_BM3(P,300K)·exp(∫₃₀₀ᵀ α dT). Valid 6.57–60.52 GPa, T ≥ 300 K (data collected on heating).',
+    },
+    // --- Loubeyre et al. (1999) ---
+    {
+      id: 'vii_h2o_loubeyre1999',
+      citation: 'Loubeyre et al. (1999)',
+      fullRef: 'Loubeyre, P. et al. (1999). Modulated phases and proton centring in ice observed by X-ray diffraction up to 170 GPa. Nature, 397, 503–506.',
+      doi: '10.1038/17300',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Fig. 1 caption: V₀=14.52 cm³/mol, K₀=4.26 GPa, K₀′=7.75. RT (300 K), 2–170 GPa.
+      params: {
+        V0:    { value: '14.52', unit: 'cm3/mol' },
+        T_ref: { value: '300',  unit: 'K' },
+        P_ref: { value: '0',    unit: 'GPa' },
+        K0:    { value: '4.26', unit: 'GPa' },
+        K0p:   { value: '7.75', unit: '1' },
+      },
+      notes: 'Vinet fit, 2–170 GPa, RT. V₀ fixed at ambient value. SCXRD.',
+    },
+    // --- Wolanin et al. (1997) ---
+    {
+      id: 'vii_h2o_wolanin1997_bm3',
+      citation: 'Wolanin et al. (1997) BM3',
+      fullRef: 'Wolanin, E. et al. (1997). Equation of state of ice VII up to 106 GPa. Phys. Rev. B, 56, 5781.',
+      doi: '10.1103/PhysRevB.56.5781',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table I: a₀=3.451(8) Å (Z=2) → V_cell=41.10(29) Å³/cell. B₀=14.9(8) GPa fixed, B₀'=5.4(1). RT.
+      params: {
+        V0:    { value: '41.10(29)', unit: 'A3/cell' },
+        T_ref: { value: '300',       unit: 'K' },
+        P_ref: { value: '0',         unit: 'GPa' },
+        K0:    { value: '14.9(8)',   unit: 'GPa' },
+        K0p:   { value: '5.4(1)',    unit: '1' },
+      },
+      notes: 'BM3 fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
+    },
+    {
+      id: 'vii_h2o_wolanin1997_vinet',
+      citation: 'Wolanin et al. (1997) Vinet',
+      fullRef: 'Wolanin, E. et al. (1997). Equation of state of ice VII up to 106 GPa. Phys. Rev. B, 56, 5781.',
+      doi: '10.1103/PhysRevB.56.5781',
+      eosType: 'Vinet',
+      molecule: 'H2O',
+      isothermal: true,
+      // Table I: a₀=3.427(8) Å (Z=2) → V_cell=40.25(28) Å³/cell. B₀=14.9(8) GPa fixed, B₀'=6.2(1). RT.
+      params: {
+        V0:    { value: '40.25(28)', unit: 'A3/cell' },
+        T_ref: { value: '300',       unit: 'K' },
+        P_ref: { value: '0',         unit: 'GPa' },
+        K0:    { value: '14.9(8)',   unit: 'GPa' },
+        K0p:   { value: '6.2(1)',    unit: '1' },
+      },
+      notes: 'Vinet fit, ~5–106 GPa, RT. K₀ was fixed during fitting. PXRD.',
+    },
+    // --- Fei et al. (1993) ---
+    {
+      id: 'vii_h2o_fei1993',
+      citation: 'Fei et al. (1993)',
+      fullRef: 'Fei, Y., Mao, H.-K. & Hemley, R.J. (1993). Thermal expansivity, bulk modulus, and melting curve of H₂O–ice VII to 20 GPa. J. Chem. Phys., 99, 5369–5373.',
+      doi: '10.1063/1.465980',
+      eosType: 'BM3Thermal',
+      molecule: 'H2O',
+      params: {
+        V0:    { value: '12.3(2)',  unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '23.9(7)', unit: 'GPa' },
+        K0p:   { value: '4.2(5)',  unit: '1' },
+        // α₀(T) = a₀ + a₁T; a₀=−3.9×10⁻⁴, a₁=1.5×10⁻⁶. alpha = α₀(300K), alpha1 = a₁
+        alpha:  { value: '6.0', unit: '10-5/K' },
+        alpha1: { value: '1.5', unit: '10-6/K2' },
+      },
+      notes: 'BM3 (isothermal, 300 K): P = (3K₀/2)(x⁷/³−x⁵/³)(1+(3/4)(K₀′−4)(x²/³−1)), x=V₀/V. PVT: V(P,T)=V(P,300K)·exp[∫α(P,T)dT], α(P,T)=α₀(T)(1+K′₀/K₀·P)^(−η), α₀(T)=a₀+a₁T; a₀=−3.9×10⁻⁴, a₁=1.5×10⁻⁶, η=0.9. Pressure-dependent α correction (η) not implemented; zero-pressure α₀(T) is used.',
+    },
+    // --- Hemley et al. (1987) ---
+    {
+      id: 'vii_h2o_hemley1987',
+      citation: 'Hemley et al. (1987)',
+      fullRef: 'Hemley, R.J. et al. (1987). Static compression of H₂O-ice to 128 GPa. Nature, 330, 737–740.',
+      doi: '10.1038/330737a0',
+      eosType: 'BM3',
+      molecule: 'H2O',
+      isothermal: true,
+      // Fig. 2 caption in Hemley et al. (1987): V₀₂=12.3(3) cm³/mol, K₀₂=23.7(9) GPa, K₀₂'=4.15(7). RT.
+      // V₀ fitted simultaneously with K₀ using Jeanloz (1981) finite-strain method (BM3 form, p* = ρ₀₁ of ice I).
+      params: {
+        V0:    { value: '12.3(3)',  unit: 'cm3/mol' },
+        T_ref: { value: '300',     unit: 'K' },
+        P_ref: { value: '0',       unit: 'GPa' },
+        K0:    { value: '23.7(9)', unit: 'GPa' },
+        K0p:   { value: '4.15(7)', unit: '1' },
+      },
+      notes: 'BM3 (Jeanloz 1981 finite-strain form): P = (3K₀/2)(x⁷/³−x⁵/³)(1+(3/4)(K₀′−4)(x²/³−1)), x=V₀/V. V₀ extrapolated to zero pressure by linear least-squares fit using ice I density as reference. 4.3–128 GPa, RT.',
     },
   ],
 };
